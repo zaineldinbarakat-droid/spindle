@@ -3,11 +3,32 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject private var player: PlayerManager
     @EnvironmentObject private var notch: NotchViewModel
+    @EnvironmentObject private var timer: PomodoroTimer
+    @EnvironmentObject private var desktop: DesktopController
 
     @State private var launchAtLogin = LaunchAtLogin.isEnabled
+    @AppStorage(ArtworkStyle.storageKey) private var artworkStyle: ArtworkStyle = .vinyl
 
     var body: some View {
         Form {
+            Section("Appearance") {
+                Picker("Show the song as", selection: $artworkStyle) {
+                    ForEach(ArtworkStyle.allCases) { style in
+                        Text(style.title).tag(style)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                Picker("Desktop wallpaper", selection: Binding(
+                    get: { desktop.isBackdropVisible },
+                    set: { desktop.setBackdrop(visible: $0) }
+                )) {
+                    Text("My wallpaper").tag(false)
+                    Text("Retro turntable").tag(true)
+                }
+                .pickerStyle(.segmented)
+            }
+
             Section("Behaviour") {
                 Toggle("Open when the cursor reaches the notch", isOn: $notch.openOnHover)
                 Toggle("Show visualizer in the collapsed view", isOn: $notch.showVisualizer)
@@ -49,6 +70,33 @@ struct SettingsView: View {
                 }
             }
 
+            Section("Focus timer") {
+                Stepper("Focus: \(timer.focusMinutes) min", value: $timer.focusMinutes, in: 1...120)
+                Stepper("Short break: \(timer.shortBreakMinutes) min", value: $timer.shortBreakMinutes, in: 1...60)
+                Stepper("Long break: \(timer.longBreakMinutes) min", value: $timer.longBreakMinutes, in: 1...90)
+                Stepper("Long break every \(timer.sessionsBeforeLongBreak) sessions",
+                        value: $timer.sessionsBeforeLongBreak, in: 2...8)
+                Toggle("Start the next phase automatically", isOn: $timer.autoStartNextPhase)
+                Toggle("Drop the notch open when a phase ends", isOn: $timer.peekNotchOnPhaseEnd)
+                Toggle("Pause music during breaks", isOn: $timer.pauseMusicOnBreak)
+                Toggle("Start music when focus begins", isOn: $timer.resumeMusicOnFocus)
+            }
+
+            Section("Desktop") {
+                ForEach(DesktopWidgetKind.allCases) { kind in
+                    Toggle("\(kind.title) widget", isOn: Binding(
+                        get: { desktop.isWidgetVisible(kind) },
+                        set: { $0 ? desktop.showWidget(kind) : desktop.hideWidget(kind) }
+                    ))
+                }
+                Button(desktop.isFullScreenVisible ? "Exit Full-Screen Turntable" : "Open Full-Screen Turntable") {
+                    desktop.toggleFullScreen()
+                }
+                Text("Drag a widget by its wooden edge to move it; right-click to remove it.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
             Section {
                 Text("Spindle reads and controls Music and Spotify through Apple Events. "
                      + "It never connects to a streaming service itself, so nothing leaves this Mac.")
@@ -57,6 +105,6 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 420, height: 330)
+        .frame(width: 460, height: 640)
     }
 }

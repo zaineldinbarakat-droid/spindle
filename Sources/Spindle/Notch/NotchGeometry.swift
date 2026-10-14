@@ -62,6 +62,15 @@ struct NotchMetrics: Equatable {
                       height: notchHeight)
     }
 
+    /// The little record in the collapsed pill's left wing.
+    func collapsedRecordZone() -> CGRect {
+        let wingLeft = notchCenterX - notchWidth / 2 - Theme.collapsedWingWidth
+        return CGRect(x: wingLeft + Theme.notchCornerRadius - 4,
+                      y: screenFrame.maxY - notchHeight,
+                      width: notchHeight + 16,
+                      height: notchHeight)
+    }
+
     /// Once open, the cursor may roam over the whole panel without it closing.
     func liveZone() -> CGRect {
         CGRect(x: notchCenterX - Theme.expandedWidth / 2 - 12,
