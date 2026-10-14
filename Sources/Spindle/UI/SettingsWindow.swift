@@ -17,9 +17,11 @@ enum SettingsWindow {
         let view = SettingsView()
             .environmentObject(AppEnvironment.shared.player)
             .environmentObject(AppEnvironment.shared.notch)
+            .environmentObject(AppEnvironment.shared.timer)
+            .environmentObject(AppEnvironment.shared.desktop)
 
         let created = NSWindow(
-            contentRect: CGRect(x: 0, y: 0, width: 420, height: 330),
+            contentRect: CGRect(x: 0, y: 0, width: 460, height: 640),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
             defer: false

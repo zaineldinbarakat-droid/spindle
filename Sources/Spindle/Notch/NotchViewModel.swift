@@ -8,6 +8,12 @@ final class NotchViewModel: ObservableObject {
         case expanded
     }
 
+    /// What the expanded panel shows.
+    enum Tab: Equatable {
+        case player
+        case focus
+    }
+
     @Published private(set) var state: State = .collapsed
 
     /// `$state` is unreachable from other types once the setter is private, so the
@@ -16,6 +22,7 @@ final class NotchViewModel: ObservableObject {
     @Published private(set) var metrics: NotchMetrics = .current()
     /// Set while the tonearm is held, so the panel cannot close mid-drag.
     @Published var isInteracting = false
+    @Published var tab: Tab = .player
 
     // Backed by UserDefaults by hand rather than with @AppStorage: inside an
     // ObservableObject that wrapper writes the value but never fires objectWillChange,

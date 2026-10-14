@@ -14,16 +14,19 @@ final class NotchWindowController {
     private var panel: NotchPanel?
     private let viewModel: NotchViewModel
     private let player: PlayerManager
+    private let timer: PomodoroTimer
 
     private var globalMouseMonitor: Any?
     private var localMouseMonitor: Any?
+    private var globalClickMonitor: Any?
     private var cancellables = Set<AnyCancellable>()
     /// Delays closing slightly so a fast diagonal exit doesn't flap the panel.
     private var closeWorkItem: DispatchWorkItem?
 
-    init(viewModel: NotchViewModel, player: PlayerManager) {
+    init(viewModel: NotchViewModel, player: PlayerManager, timer: PomodoroTimer) {
         self.viewModel = viewModel
         self.player = player
+        self.timer = timer
     }
 
     // MARK: - Setup
@@ -62,6 +65,7 @@ final class NotchWindowController {
             let root = NotchRootView()
                 .environmentObject(viewModel)
                 .environmentObject(player)
+                .environmentObject(timer)
             let hosting = NSHostingView(rootView: root)
             hosting.frame = CGRect(origin: .zero, size: metrics.windowFrame().size)
             created.contentView = hosting
@@ -94,6 +98,51 @@ final class NotchWindowController {
         localMouseMonitor = NSEvent.addLocalMonitorForEvents(matching: events) { [weak self] event in
             Task { @MainActor in self?.handleMouseMoved() }
             return event
+        }
+
+        // While collapsed the panel is click-through, so clicks on the notch reach us
+        // only through a global monitor.
+        globalClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDown) { [weak self] _ in
+            Task { @MainActor in self?.handleGlobalClick() }
+        }
+    }
+
+    /// Hover already opens the panel, so this matters when hover-to-open is off: a
+    /// click on the little record opens the music app, anywhere else on the notch
+    /// opens the panel, and a click elsewhere on screen closes it.
+    private func handleGlobalClick() {
+        let location = NSEvent.mouseLocation
+        let metrics = viewModel.metrics
+
+        if viewModel.isExpanded {
+            if !viewModel.openOnHover && !metrics.liveZone().contains(location) {
+                viewModel.collapse()
+            }
+            return
+        }
+
+        guard metrics.hoverZone().contains(location) else { return }
+        if metrics.collapsedRecordZone().contains(location) {
+            player.openSourceApp()
+        } else if !viewModel.openOnHover {
+            panel?.ignoresMouseEvents = false
+            viewModel.expand()
+        }
+    }
+
+    /// Drops the panel open for a few seconds on a given tab, then tucks it away
+    /// again unless the cursor has moved onto it.
+    func peek(tab: NotchViewModel.Tab, for seconds: TimeInterval = 4) {
+        viewModel.tab = tab
+        closeWorkItem?.cancel()
+        closeWorkItem = nil
+        panel?.ignoresMouseEvents = false
+        viewModel.expand()
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { [weak self] in
+            guard let self, self.viewModel.isExpanded else { return }
+            guard !self.viewModel.metrics.liveZone().contains(NSEvent.mouseLocation) else { return }
+            self.viewModel.collapse()
         }
     }
 
@@ -135,6 +184,8 @@ final class NotchWindowController {
     func tearDown() {
         if let globalMouseMonitor { NSEvent.removeMonitor(globalMouseMonitor) }
         if let localMouseMonitor { NSEvent.removeMonitor(localMouseMonitor) }
+        if let globalClickMonitor { NSEvent.removeMonitor(globalClickMonitor) }
+        globalClickMonitor = nil
         globalMouseMonitor = nil
         localMouseMonitor = nil
         cancellables.removeAll()

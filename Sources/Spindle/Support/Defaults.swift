@@ -6,6 +6,21 @@ enum Defaults {
         case openOnHover
         case showVisualizer
         case pinnedProvider
+
+        // Focus timer
+        case focusMinutes
+        case shortBreakMinutes
+        case longBreakMinutes
+        case sessionsBeforeLongBreak
+        case autoStartNextPhase
+        case pauseMusicOnBreak
+        case resumeMusicOnFocus
+        case peekNotchOnPhaseEnd
+
+        // Desktop
+        case recordWidgetVisible
+        case turntableWidgetVisible
+        case desktopBackdropVisible
     }
 
     static func bool(_ key: Key, default fallback: Bool) -> Bool {
@@ -14,6 +29,15 @@ enum Defaults {
     }
 
     static func set(_ key: Key, _ value: Bool) {
+        UserDefaults.standard.set(value, forKey: key.rawValue)
+    }
+
+    static func int(_ key: Key, default fallback: Int) -> Int {
+        guard UserDefaults.standard.object(forKey: key.rawValue) != nil else { return fallback }
+        return UserDefaults.standard.integer(forKey: key.rawValue)
+    }
+
+    static func set(_ key: Key, _ value: Int) {
         UserDefaults.standard.set(value, forKey: key.rawValue)
     }
 

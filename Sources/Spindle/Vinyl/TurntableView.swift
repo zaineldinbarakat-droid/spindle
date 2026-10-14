@@ -22,6 +22,12 @@ struct TurntableView: View {
                       accent: player.accent,
                       isSpinning: player.snapshot.isPlaying)
                 .frame(width: diameter, height: diameter)
+                // Clicking the record brings its app forward. The tonearm sits on top
+                // and only claims its own outline, so the two never fight.
+                .contentShape(Circle())
+                .onTapGesture { player.openSourceApp() }
+                .pointingHandOnHover()
+                .help("Open \(player.sourceProvider.displayName)")
                 .position(center)
 
             TonearmView(

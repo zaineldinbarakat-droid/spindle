@@ -16,6 +16,32 @@ Built and verified against a MacBook Pro `Mac17,2` on macOS 27.0.
 | Tonearm inverse geometry | Unit-tested, round-trip error 1.4e-15 |
 | SwiftUI view layer | **Needs Xcode to compile — see below** |
 
+## What it does
+
+- **Notch turntable.** Hover the notch: the record spins with the cover art on the label,
+  and the tonearm tracks the playhead. Drag the arm to scrub.
+- **Click to open the source app.** Click the record (in the notch, a widget or full
+  screen), the track title, or the left side of the notch strip, and Spotify or Music
+  comes to the front with its window showing.
+- **Focus timer.** The timer tab in the notch is a Pomodoro clock: 25/5 by default with
+  a long break every four sessions, all adjustable in Settings. While it runs, the
+  countdown sits in the collapsed notch. When a phase ends you get a chime and a
+  notification, and the notch drops open briefly. It can also pause your music during
+  breaks and start it again when focus begins.
+- **Desktop widgets.** A small *Record* widget and a wide *Turntable* widget sit on the
+  desktop like macOS widgets: above the icons, below your windows, on every Space.
+  They're live, so the record spins and you can drag the tonearm. Drag the wooden edge
+  to move one; right-click it to remove it.
+- **Turntable wallpaper.** A full-screen retro scene (walnut deck, blurred cover-art
+  room, film grain, big serif type) drawn behind your desktop icons. Off by default;
+  *Desktop Wallpaper → My Wallpaper* puts yours back.
+- **Vinyl or cover.** *Show Song As* switches between the spinning record and the plain
+  album cover, in the notch, the widgets and full screen.
+- **Full-screen turntable.** The same scene as an interactive full-screen space.
+  Esc leaves it.
+
+Everything is in the menu-bar icon's menu and in Settings.
+
 ## Requirements
 
 **Xcode is required.** The Command Line Tools are not enough: in the macOS 26+ SDK
@@ -82,6 +108,14 @@ Sources/Spindle/
     NotchPanel          borderless non-activating NSPanel above the menu bar
     NotchWindowController  global mouse monitors, hover state
     NotchRootView       collapsed pill / expanded panel
+  Focus/
+    PomodoroTimer       deadline-based phases, notifications, music pause/resume
+    FocusView           kitchen-timer dial, controls, mini now-playing
+  Desktop/
+    DesktopPanel        desktop-layer panels (widget level / wallpaper level)
+    DesktopController   widgets, wallpaper backdrop, full-screen window
+    DesktopWidgetViews  walnut chrome, small and wide widgets
+    BackdropView        the full-screen retro scene
   Vinyl/
     TonearmGeometry     pivot maths, exact progress <-> angle inverse
     VinylView           static grooves + rotating sheen, label, spindle
@@ -103,9 +137,12 @@ produced visible tearing; hit-testing carries the state instead.
 
 Honest list, so nothing here is a surprise:
 
-- **Widgets.** Home Screen and Notification Centre widgets need a WidgetKit app
-  extension, which needs a real Xcode project — an SPM package cannot produce one. The
-  player would also need an App Group to share state with the extension.
+- **WidgetKit widgets.** The desktop widgets are Spindle's own windows, not
+  Notification Centre widgets. Apple's widgets need an App Group backed by a
+  provisioning profile (so a paid developer team; this machine has no signing
+  identity). They are also limited to timeline snapshots, so the record couldn't spin
+  and the arm couldn't be dragged. iPhone home-screen widgets would need a separate
+  iOS app.
 - **YouTube, Tidal, Amazon Music, SoundCloud.** None expose a scripting dictionary. They
   are browser or Electron apps, so the only routes are a browser extension or each
   service's Web API with OAuth — a different and much larger integration than the one

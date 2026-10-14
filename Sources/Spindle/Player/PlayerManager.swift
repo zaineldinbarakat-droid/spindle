@@ -116,6 +116,27 @@ final class PlayerManager: ObservableObject {
         }
     }
 
+    // MARK: - Source app
+
+    /// The app a click on the record should bring forward: the one we are showing,
+    /// otherwise whichever is running, otherwise the one we last followed.
+    var sourceProvider: ProviderID {
+        if snapshot.hasTrack { return snapshot.provider }
+        if let pinned = pinnedProvider { return pinned }
+        return availableProviders.first ?? activeProviderID
+    }
+
+    /// Brings the music app to the front. `openApplication` rather than
+    /// `NSRunningApplication.activate`, because it also sends the reopen event, so Music
+    /// and Spotify show their main window even if the user had closed it.
+    func openSourceApp() {
+        let bundleID = sourceProvider.bundleIdentifier
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else { return }
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = true
+        NSWorkspace.shared.openApplication(at: url, configuration: configuration)
+    }
+
     func openAutomationSettings() {
         let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation")!
         NSWorkspace.shared.open(url)
@@ -243,6 +264,22 @@ final class PlayerManager: ObservableObject {
         positionAnchor = (interpolatedPosition, CACurrentMediaTime())
         snapshot.isPlaying.toggle()
         active?.playPause()
+        scheduleConfirmation()
+    }
+
+    func play() {
+        guard snapshot.hasTrack, !snapshot.isPlaying else { return }
+        positionAnchor = (interpolatedPosition, CACurrentMediaTime())
+        snapshot.isPlaying = true
+        active?.play()
+        scheduleConfirmation()
+    }
+
+    func pause() {
+        guard snapshot.isPlaying else { return }
+        positionAnchor = (interpolatedPosition, CACurrentMediaTime())
+        snapshot.isPlaying = false
+        active?.pause()
         scheduleConfirmation()
     }
 
