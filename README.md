@@ -36,9 +36,13 @@ Built and verified against a MacBook Pro `Mac17,2` on macOS 27.0.
 - **Turntable wallpaper.** A full-screen retro scene (walnut deck, blurred cover-art
   room, film grain, big serif type) drawn behind your desktop icons. Off by default;
   *Desktop Wallpaper → My Wallpaper* puts yours back.
-- **Notch look.** *Song Color* (the default) washes the notch in a deep tint of the
-  cover's dominant colour, cross-fading when the song changes; *Black* blends into the
-  hardware notch; and
+- **Collapsed notch.** The album cover on the left and, on the right, a glowing
+  "now playing" indicator in the cover's colour that breathes while music plays and
+  settles when it's paused (or the spinning record, if you prefer).
+- **Notch look.** *Song Color* (the default) washes the open panel in a deep tint of
+  the cover's dominant colour, cross-fading when the song changes, while the notch
+  itself stays hardware-black — or let the colour reach into the notch too; *Black*
+  blends into the hardware notch; and
   *Liquid Glass* uses macOS 26's glass material tinted with the cover.
 - **Vinyl or cover.** *Show Song As* switches between the spinning record and the plain
   album cover, in the notch, the widgets and full screen.
@@ -61,8 +65,8 @@ of the screen.
   bar have no delay (measured on macOS 27: ~100 ms to show, ~70 ms to hide, including
   macOS redrawing the bar), with a little spatial slack so resting on the bar's edge
   never flickers. An open menu holds things in place.
-- **Two-finger click** on Sleeve's icon or an empty part of the bar shows or hides the
-  hidden apps (⌃-click the icon for Sleeve's menu).
+- **Two-finger click** Sleeve's icon for its options (show hidden apps, Zen mode,
+  search, menu bar color, settings…), or the empty bar to show or hide your apps.
 - **An icon with two faces,** like Ice's image sets, always in the bar: an outlined eye
   while your apps are tucked away; hover it and it morphs into the filled eye with a
   little bounce as they come out, and morphs back when you move away. Or dot, ellipsis,
@@ -173,9 +177,12 @@ After installing Xcode:
 
 ```bash
 sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
-./build.sh
-open build/Spindle.app build/Sleeve.app
+./install.sh
 ```
+
+`install.sh` builds both apps and installs them in /Applications. Sleeve has to live
+there on macOS 27: MenuBarAgent only keeps an app's own icon on screen under a native
+hiding restriction when the app is installed in /Applications.
 
 On first launch macOS asks permission to control Music and Spotify. That prompt is the
 whole integration — say no and the app has nothing to display.

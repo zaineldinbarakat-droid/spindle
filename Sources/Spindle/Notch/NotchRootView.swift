@@ -78,7 +78,11 @@ struct NotchRootView: View {
 
         return HStack(spacing: 0) {
             HStack(spacing: 0) {
-                ArtworkThumbnail(size: thumb)
+                if viewModel.collapsedShowsCover {
+                    CollapsedCover(size: thumb)
+                } else {
+                    ArtworkThumbnail(size: thumb)
+                }
                 Spacer(minLength: 0)
             }
             // Clear of the inverted fillet where the shape meets the bezel.
@@ -94,7 +98,7 @@ struct NotchRootView: View {
                 if timer.isActive {
                     CollapsedCountdown()
                 } else if viewModel.showVisualizer {
-                    VisualizerView(isPlaying: player.snapshot.isPlaying, accent: player.accent)
+                    RadianceView(isPlaying: player.snapshot.isPlaying, accent: player.accent)
                 }
             }
             .padding(.trailing, Theme.notchCornerRadius + 2)
@@ -253,6 +257,35 @@ private struct TabSwitcher: View {
         }
         .buttonStyle(.plain)
         .help(help)
+    }
+}
+
+/// The album cover in the collapsed notch's left wing: small, rounded, crisp, with a
+/// faint rim of its own colour so it sits on the black like a lit tile.
+private struct CollapsedCover: View {
+    var size: CGFloat
+    @EnvironmentObject private var player: PlayerManager
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: size * 0.24, style: .continuous)
+        ZStack {
+            shape.fill(player.accent.opacity(0.35))
+            if let artwork = player.artwork {
+                Image(nsImage: artwork)
+                    .resizable()
+                    .interpolation(.high)
+                    .aspectRatio(contentMode: .fill)
+                    .transition(.opacity)
+            } else {
+                Image(systemName: "music.note")
+                    .font(.system(size: size * 0.5, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.7))
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(shape)
+        .overlay(shape.strokeBorder(player.accent.opacity(0.45), lineWidth: 0.75))
+        .animation(.easeOut(duration: 0.35), value: player.artwork)
     }
 }
 

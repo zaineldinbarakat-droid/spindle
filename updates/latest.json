@@ -1,5 +1,5 @@
 {
-  "version": "0.3.2",
-  "notes": "Sleeve's icon is always shown and animates as your apps open and close; the menu bar color now sits across the very top like Ice, with an intensity slider.",
+  "version": "0.3.3",
+  "notes": "Sleeve: its icon stays visible (install in Applications), hover works while any app is in front, two-finger click its icon for options. Spindle: smooth notch with no bump, album cover and a glowing playing indicator in the collapsed notch, optional album color in the notch.",
   "minimumSystemVersion": "14.0"
 }

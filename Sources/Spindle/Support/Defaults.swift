@@ -7,6 +7,8 @@ enum Defaults {
         case showVisualizer
         case pinnedProvider
         case notchStyle
+        case tintNotch
+        case collapsedShowsCover
 
         // Focus timer
         case focusMinutes

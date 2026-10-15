@@ -54,6 +54,15 @@ final class NotchViewModel: ObservableObject {
     @Published var style: Style = Style(rawValue: Defaults.string(.notchStyle) ?? "") ?? .songColor {
         didSet { Defaults.set(.notchStyle, style.rawValue) }
     }
+    /// Song Color only: let the colour reach the collapsed pill and the strip beside
+    /// the camera. Off keeps everything around the notch hardware-black.
+    @Published var tintNotch: Bool = Defaults.bool(.tintNotch, default: false) {
+        didSet { Defaults.set(.tintNotch, tintNotch) }
+    }
+    /// The collapsed notch's left wing: the album cover (default) or the spinning record.
+    @Published var collapsedShowsCover: Bool = Defaults.bool(.collapsedShowsCover, default: true) {
+        didSet { Defaults.set(.collapsedShowsCover, collapsedShowsCover) }
+    }
 
     // Backed by UserDefaults by hand rather than with @AppStorage: inside an
     // ObservableObject that wrapper writes the value but never fires objectWillChange,
