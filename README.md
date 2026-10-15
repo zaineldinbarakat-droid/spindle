@@ -57,9 +57,14 @@ of the screen.
   Apple's own icons. Hover over Sleeve's icon (or the right side of the bar) and every
   app icon comes back; move away and they tuck away again. Pick apps to always keep
   visible under *Settings → Layout*.
-- **An icon with two faces.** 🫥 while your apps are tucked away, 👀 while you're looking
-  at them — or Ice's styles (eye, dot, ellipsis, chevron, door), a record, or your own
-  image, each with a hidden and a showing face.
+- **Instant.** Revealing on hover and hiding when the cursor leaves the menu bar have no
+  delay (measured on macOS 27: ~100 ms to show and ~70 ms to hide, including macOS
+  redrawing the bar). An open menu holds things in place.
+- **Two-finger click** on Sleeve's icon or an empty part of the bar shows or hides the
+  hidden apps (⌃-click the icon for Sleeve's menu).
+- **An icon with two faces,** like Ice's image sets: an outlined eye while your apps are
+  tucked away, a filled one while they're showing — or dot, ellipsis, chevron, door,
+  record, or your own image.
 - **Three sections** (with hide-all off). Visible, Hidden and Always Hidden, separated by Sleeve's toggle and
   two faint │ dividers. ⌘-drag icons across the dividers. On macOS 14–26 you can also
   drag them between the columns in *Settings → Layout* and Sleeve performs the ⌘-drag
