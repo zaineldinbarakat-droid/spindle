@@ -14,14 +14,36 @@ final class SleeveSettings: ObservableObject {
 
     // MARK: Reveal
 
+    /// The look of Sleeve's menu bar icon. Every style has two faces, like Ice's
+    /// image sets: one while apps are tucked away, one while they're showing.
     enum ToggleIcon: String, CaseIterable, Identifiable, Codable {
-        case dot, chevron, sleeve
+        case emoji, eye, dot, ellipsis, chevron, door
+        case record = "sleeve"
+        case custom
         var id: String { rawValue }
         var title: String {
             switch self {
+            case .emoji: return "Emoji 🫥 👀"
+            case .eye: return "Eye"
             case .dot: return "Dot"
+            case .ellipsis: return "Ellipsis"
             case .chevron: return "Chevron"
-            case .sleeve: return "Record"
+            case .door: return "Door"
+            case .record: return "Record"
+            case .custom: return "Custom Image"
+            }
+        }
+        /// (hidden, showing). Emoji are drawn as text; the rest are SF Symbols.
+        var faces: (hidden: String, shown: String) {
+            switch self {
+            case .emoji: return ("🫥", "👀")
+            case .eye: return ("eye.slash", "eye.fill")
+            case .dot: return ("circle", "circle.fill")
+            case .ellipsis: return ("ellipsis.circle", "ellipsis.circle.fill")
+            case .chevron: return ("chevron.compact.left", "chevron.compact.right")
+            case .door: return ("door.left.hand.closed", "door.left.hand.open")
+            case .record: return ("smallcircle.filled.circle", "opticaldisc")
+            case .custom: return ("", "")
             }
         }
     }
@@ -44,6 +66,10 @@ final class SleeveSettings: ObservableObject {
 
     @Published var toggleIcon: ToggleIcon { didSet { save(toggleIcon.rawValue, "toggleIcon") } }
     @Published var revealOnHover: Bool { didSet { save(revealOnHover, "revealOnHover") } }
+    /// Hovering over Sleeve's own icon reveals, like pointing at Ice's icon.
+    @Published var revealOnIconHover: Bool { didSet { save(revealOnIconHover, "revealOnIconHover") } }
+    /// PNG for the Custom icon style, scaled to menu bar size.
+    @Published var customIconData: Data? { didSet { store.set(customIconData, forKey: "customIconData") } }
     @Published var revealOnScroll: Bool { didSet { save(revealOnScroll, "revealOnScroll") } }
     @Published var revealOnEmptyClick: Bool { didSet { save(revealOnEmptyClick, "revealOnEmptyClick") } }
     @Published var rehideMode: RehideMode { didSet { save(rehideMode.rawValue, "rehideMode") } }
@@ -97,7 +123,18 @@ final class SleeveSettings: ObservableObject {
         func bool(_ key: String, _ fallback: Bool) -> Bool {
             d.object(forKey: key) == nil ? fallback : d.bool(forKey: key)
         }
-        toggleIcon = ToggleIcon(rawValue: d.string(forKey: "toggleIcon") ?? "") ?? .chevron
+        // v3: the emoji icon and icon hover arrived together, and the native-hiding
+        // switch may have been turned off while the cover froze Sleeve (fixed in v3);
+        // bring all three to the new defaults once.
+        if d.integer(forKey: "settingsVersion") < 3 {
+            d.set(3, forKey: "settingsVersion")
+            d.set(ToggleIcon.emoji.rawValue, forKey: "toggleIcon")
+            d.set(true, forKey: "useNativeHiding")
+            d.set(true, forKey: "revealOnIconHover")
+        }
+        toggleIcon = ToggleIcon(rawValue: d.string(forKey: "toggleIcon") ?? "") ?? .emoji
+        revealOnIconHover = bool("revealOnIconHover", true)
+        customIconData = d.data(forKey: "customIconData")
         revealOnHover = bool("revealOnHover", true)
         revealOnScroll = bool("revealOnScroll", true)
         revealOnEmptyClick = bool("revealOnEmptyClick", false)

@@ -111,40 +111,39 @@ struct Tonearm: View {
     }
 }
 
-// MARK: - Sleeve: a record sliding out of its sleeve
+// MARK: - Sleeve: an eye, its iris a little record — "looking at your apps"
+
+/// The almond of an eye, drawn as two arcs (SF Symbols aren't licensed for app icons).
+struct EyeShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let left = CGPoint(x: rect.minX, y: rect.midY)
+        let right = CGPoint(x: rect.maxX, y: rect.midY)
+        path.move(to: left)
+        path.addQuadCurve(to: right, control: CGPoint(x: rect.midX, y: rect.minY - rect.height * 0.5))
+        path.addQuadCurve(to: left, control: CGPoint(x: rect.midX, y: rect.maxY + rect.height * 0.5))
+        path.closeSubpath()
+        return path
+    }
+}
 
 struct SleeveIcon: View {
     var body: some View {
-        Tile(colors: [Color(red: 0.36, green: 0.62, blue: 0.98), Color(red: 0.42, green: 0.28, blue: 0.86)]) {
+        Tile(colors: [Color(red: 0.55, green: 0.80, blue: 1.00), Color(red: 0.36, green: 0.42, blue: 0.95)]) {
             ZStack {
-                Record(size: 470, label: [Color(red: 0.55, green: 0.90, blue: 0.80),
-                                          Color(red: 0.25, green: 0.60, blue: 0.95)])
-                    .offset(x: 120, y: 0)
-                // The sleeve: a cream card with a coral stripe and a thumb notch.
-                ZStack {
-                    RoundedRectangle(cornerRadius: 34, style: .continuous)
-                        .fill(LinearGradient(colors: [Color(red: 1.0, green: 0.97, blue: 0.90),
-                                                      Color(red: 0.95, green: 0.89, blue: 0.80)],
-                                             startPoint: .topLeading, endPoint: .bottomTrailing))
-                    RoundedRectangle(cornerRadius: 34, style: .continuous)
-                        .fill(LinearGradient(colors: [Color(red: 1.0, green: 0.55, blue: 0.45),
-                                                      Color(red: 0.98, green: 0.40, blue: 0.52)],
-                                             startPoint: .leading, endPoint: .trailing))
-                        .frame(height: 96)
-                        .offset(y: 120)
-                    Circle()
-                        .fill(Color(red: 1.0, green: 0.55, blue: 0.45))
-                        .frame(width: 120, height: 120)
-                        .offset(y: -60)
-                    Circle()
-                        .fill(Color(red: 1.0, green: 0.97, blue: 0.90))
-                        .frame(width: 44, height: 44)
-                        .offset(y: -60)
-                }
-                .frame(width: 440, height: 440)
-                .shadow(color: .black.opacity(0.35), radius: 24, x: 10, y: 14)
-                .offset(x: -110, y: 0)
+                EyeShape()
+                    .fill(Color.white)
+                    .frame(width: 600, height: 330)
+                    .shadow(color: Color(red: 0.15, green: 0.2, blue: 0.5).opacity(0.35), radius: 26, y: 16)
+                Record(size: 270, label: [Color(red: 1.0, green: 0.60, blue: 0.40),
+                                          Color(red: 0.95, green: 0.35, blue: 0.55)])
+                    .mask(EyeShape().frame(width: 600, height: 330))
+                // Catch-light: the spark that makes an emoji eye feel alive.
+                Circle().fill(Color.white.opacity(0.9))
+                    .frame(width: 46, height: 46)
+                    .offset(x: 58, y: -62)
             }
+            .offset(y: 8)
         }
     }
 }

@@ -136,15 +136,22 @@ final class SectionManager: ObservableObject {
             button.action = #selector(toggleClicked(_:))
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
             button.setAccessibilityLabel("Sleeve")
+            // Enter/exit events still reach a status item's button on macOS 27, even
+            // though MenuBarAgent draws it (checked with a test item).
+            button.addTrackingArea(NSTrackingArea(rect: .zero,
+                                                  options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+                                                  owner: iconHover, userInfo: nil))
         }
         for (item, label) in [(dividerItem, "Sleeve hidden divider"), (alwaysDividerItem, "Sleeve always-hidden divider")] {
             item.button?.setAccessibilityLabel(label)
             item.button?.imagePosition = .imageOnly
         }
 
-        settings.$toggleIcon.sink { [weak self] _ in
+        settings.$toggleIcon.combineLatest(settings.$customIconData).sink { [weak self] _, _ in
             DispatchQueue.main.async { self?.updateIcons() }
         }.store(in: &cancellables)
+        iconHover.onEnter = { [weak self] in self?.iconHoverBegan() }
+        iconHover.onExit = { [weak self] in self?.iconHoverEnded() }
         // Changing how or what to hide re-applies the current state the new way.
         Publishers.Merge3(settings.$useNativeHiding.dropFirst().map { _ in () },
                           settings.$hideAllApps.dropFirst().map { _ in () },
@@ -400,12 +407,12 @@ final class SectionManager: ObservableObject {
             alwaysDividerItem.length = new == .all ? Self.dividerLength : Self.pushLength
             releaseRestriction()
         case .cover:
-            dividerItem.length = Self.dividerLength
-            alwaysDividerItem.length = Self.dividerLength
+            dividerItem.length = dividerLengthOnModernBar
+            alwaysDividerItem.length = dividerLengthOnModernBar
             releaseRestriction()
         case .native:
-            dividerItem.length = Self.dividerLength
-            alwaysDividerItem.length = Self.dividerLength
+            dividerItem.length = dividerLengthOnModernBar
+            alwaysDividerItem.length = dividerLengthOnModernBar
             applyNative(new)
         }
 
@@ -414,6 +421,12 @@ final class SectionManager: ObservableObject {
         if changed { onStateChange?(new) }
         Task { await rescanSoon() }
         if new == .collapsed { rehideTimer?.invalidate() }
+    }
+
+    /// Hide-all doesn't use sections, so the dividers shrink to nothing and leave
+    /// just Sleeve's icon — they keep their slot, so sections still work if it's off.
+    private var dividerLengthOnModernBar: CGFloat {
+        settings.hideAllApps ? 0 : Self.dividerLength
     }
 
     // MARK: - Native hiding
@@ -631,6 +644,42 @@ final class SectionManager: ObservableObject {
         }
     }
 
+    // MARK: - Hovering Sleeve's icon
+
+    private let iconHover = IconHoverTracker()
+    private var iconHoverWork: DispatchWorkItem?
+    /// Called to reveal from a hover when the Sleeve Bar is the reveal style.
+    var onHoverRevealForBar: (() -> Void)?
+
+    private func iconHoverBegan() {
+        isHoveringIcon = true
+        updateIcons()
+        guard settings.revealOnIconHover, state == .collapsed else { return }
+        // A brief dwell so the cursor merely passing over the icon doesn't fire it.
+        let work = DispatchWorkItem { [weak self] in
+            guard let self, self.isHoveringIcon, self.state == .collapsed else { return }
+            if self.settings.hideAllApps {
+                self.reveal(.all)
+            } else if self.settings.useSleeveBar {
+                self.onHoverRevealForBar?()
+            } else {
+                self.reveal(.hidden)
+            }
+        }
+        iconHoverWork?.cancel()
+        iconHoverWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: work)
+    }
+
+    private func iconHoverEnded() {
+        isHoveringIcon = false
+        iconHoverWork?.cancel()
+        iconHoverWork = nil
+        updateIcons()
+        // Hiding again is left to auto-rehide, which waits until the cursor has left
+        // the whole menu bar — revealed icons can shift the bar under the cursor.
+    }
+
     private var hintPopover: NSPopover?
 
     private func showHowToHide() {
@@ -646,19 +695,45 @@ final class SectionManager: ObservableObject {
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
     }
 
+    /// True while the cursor is over Sleeve's icon — the icon shows its "looking"
+    /// face straight away, before anything has been revealed.
+    private var isHoveringIcon = false
+
     private func updateIcons() {
-        let revealed = state != .collapsed
-        let symbol: String
-        switch settings.toggleIcon {
-        case .dot: symbol = revealed ? "circle" : "circle.fill"
-        case .chevron: symbol = revealed ? "chevron.compact.right" : "chevron.compact.left"
-        case .sleeve: symbol = revealed ? "opticaldisc" : "smallcircle.filled.circle"
+        guard let button = toggleItem.button else { return }
+        let showing = state != .collapsed || isHoveringIcon
+        let style = settings.toggleIcon
+        let face = showing ? style.faces.shown : style.faces.hidden
+
+        switch style {
+        case .emoji:
+            // Emoji are text: colour, no template tinting.
+            button.image = nil
+            button.imagePosition = .noImage
+            button.attributedTitle = NSAttributedString(
+                string: face,
+                attributes: [.font: NSFont.systemFont(ofSize: 14), .baselineOffset: -1])
+        case .custom:
+            button.title = ""
+            button.imagePosition = .imageOnly
+            let image = settings.customIconData.flatMap(NSImage.init(data:))
+                ?? NSImage(systemSymbolName: "questionmark.circle", accessibilityDescription: nil)
+            image?.size = NSSize(width: 18, height: 18)
+            button.image = image
+            // One picture, two moods: dimmed while apps are tucked away.
+            button.alphaValue = showing ? 1 : 0.5
+        default:
+            button.title = ""
+            button.imagePosition = .imageOnly
+            let small = style == .dot
+            let config = NSImage.SymbolConfiguration(pointSize: small ? 9 : 13, weight: showing ? .semibold : .regular)
+            let image = NSImage(systemSymbolName: face, accessibilityDescription: "Sleeve")?
+                .withSymbolConfiguration(config)
+            image?.isTemplate = true
+            button.image = image
+            button.alphaValue = 1
         }
-        let config = NSImage.SymbolConfiguration(pointSize: settings.toggleIcon == .dot ? 7 : 13, weight: .semibold)
-        let image = NSImage(systemSymbolName: symbol, accessibilityDescription: "Sleeve")?
-            .withSymbolConfiguration(config)
-        image?.isTemplate = true
-        toggleItem.button?.image = image
+        if style != .custom { button.alphaValue = 1 }
 
         // Dividers show a faint tick so the user can see where to drop icons. With the
         // classic method a collapsed divider is a long invisible spacer instead.
@@ -666,8 +741,9 @@ final class SectionManager: ObservableObject {
             .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 9, weight: .light))
         tick?.isTemplate = true
         let alwaysShowTicks = Self.isModernMenuBar
-        dividerItem.button?.image = (alwaysShowTicks || state != .collapsed) ? tick : nil
-        alwaysDividerItem.button?.image = (alwaysShowTicks || state == .all) ? tick : nil
+        let showTicks = !(Self.isModernMenuBar && settings.hideAllApps)
+        dividerItem.button?.image = showTicks && (alwaysShowTicks || state != .collapsed) ? tick : nil
+        alwaysDividerItem.button?.image = showTicks && (alwaysShowTicks || state == .all) ? tick : nil
         dividerItem.button?.alphaValue = 0.35
         alwaysDividerItem.button?.alphaValue = 0.35
     }
@@ -693,5 +769,19 @@ enum MenuBarGeometry {
     static func strip(of screen: NSScreen) -> CGRect {
         let h = height(of: screen)
         return CGRect(x: screen.frame.minX, y: screen.frame.maxY - h, width: screen.frame.width, height: h)
+    }
+}
+
+/// Receives enter/exit for the tracking area on Sleeve's icon.
+final class IconHoverTracker: NSResponder {
+    var onEnter: (() -> Void)?
+    var onExit: (() -> Void)?
+
+    override func mouseEntered(with event: NSEvent) {
+        DispatchQueue.main.async { self.onEnter?() }
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        DispatchQueue.main.async { self.onExit?() }
     }
 }

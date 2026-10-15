@@ -122,13 +122,13 @@ private struct GeneralTab: View {
                      : "Only icons you ⌘-drag into the Hidden sections are hidden.")
                     .font(.caption).foregroundStyle(.secondary)
             }
-            Section("Toggle") {
-                Picker("Icon", selection: $settings.toggleIcon) {
-                    ForEach(SleeveSettings.ToggleIcon.allCases) { Text($0.title).tag($0) }
+            Section("Sleeve's icon") {
+                IconStylePicker()
+                Toggle("Reveal when hovering over Sleeve's icon", isOn: $settings.revealOnIconHover)
+                if !settings.hideAllApps {
+                    Toggle("Show hidden icons in the Sleeve Bar (recommended on notched Macs)", isOn: $settings.useSleeveBar)
                 }
-                .pickerStyle(.segmented)
-                Toggle("Show hidden icons in the Sleeve Bar (recommended on notched Macs)", isOn: $settings.useSleeveBar)
-                Text("Click the toggle to reveal · ⌥-click shows Always Hidden too · right-click for the menu")
+                Text("Hover or click the icon to reveal · ⌥-click shows Always Hidden too · right-click for the menu. Tip: ⌘-drag Sleeve's icon next to the clock, so revealed apps appear to its left and it stays put under your cursor.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             if SectionManager.isModernMenuBar {
@@ -175,6 +175,80 @@ private struct GeneralTab: View {
             }
         }
         .formStyle(.grouped)
+    }
+}
+
+/// A grid of icon styles, each showing both of its faces: tucked away → showing.
+private struct IconStylePicker: View {
+    @EnvironmentObject private var settings: SleeveSettings
+
+    var body: some View {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 8) {
+            ForEach(SleeveSettings.ToggleIcon.allCases) { style in
+                Button {
+                    if style == .custom && settings.customIconData == nil {
+                        chooseCustomImage()
+                    } else {
+                        settings.toggleIcon = style
+                    }
+                } label: {
+                    VStack(spacing: 4) {
+                        HStack(spacing: 6) {
+                            face(style, showing: false)
+                            Image(systemName: "arrow.right").font(.system(size: 8)).foregroundStyle(.tertiary)
+                            face(style, showing: true)
+                        }
+                        .frame(height: 22)
+                        Text(style == .emoji ? "Emoji" : style.title).font(.caption)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .background(RoundedRectangle(cornerRadius: 8)
+                        .fill(settings.toggleIcon == style ? Color.accentColor.opacity(0.18) : Color.primary.opacity(0.04)))
+                    .overlay(RoundedRectangle(cornerRadius: 8)
+                        .strokeBorder(settings.toggleIcon == style ? Color.accentColor : .clear, lineWidth: 1.5))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        if settings.toggleIcon == .custom {
+            Button("Choose Image…", action: chooseCustomImage)
+        }
+    }
+
+    @ViewBuilder
+    private func face(_ style: SleeveSettings.ToggleIcon, showing: Bool) -> some View {
+        let name = showing ? style.faces.shown : style.faces.hidden
+        switch style {
+        case .emoji:
+            Text(name).font(.system(size: 15))
+        case .custom:
+            if let data = settings.customIconData, let image = NSImage(data: data) {
+                Image(nsImage: image).resizable().frame(width: 16, height: 16).opacity(showing ? 1 : 0.5)
+            } else {
+                Image(systemName: "photo").opacity(showing ? 1 : 0.5)
+            }
+        default:
+            Image(systemName: name).font(.system(size: 13, weight: showing ? .semibold : .regular))
+        }
+    }
+
+    private func chooseCustomImage() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.png, .jpeg, .tiff, .heic, .svg, .pdf]
+        panel.message = "Choose an image for Sleeve's menu bar icon (a simple, square shape works best)."
+        guard panel.runModal() == .OK, let url = panel.url, let image = NSImage(contentsOf: url) else { return }
+        // Store a small PNG: menu bar size at 2×, so the settings file stays tiny.
+        let side: CGFloat = 36
+        let target = NSImage(size: NSSize(width: side, height: side))
+        target.lockFocus()
+        image.draw(in: NSRect(x: 0, y: 0, width: side, height: side))
+        target.unlockFocus()
+        if let tiff = target.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
+           let png = rep.representation(using: .png, properties: [:]) {
+            settings.customIconData = png
+            settings.toggleIcon = .custom
+        }
     }
 }
 
@@ -450,11 +524,16 @@ private struct AppearanceTab: View {
                     ForEach(MenuBarStyle.Fill.allCases) { Text($0.title).tag($0) }
                 }
                 .pickerStyle(.segmented)
-                if binding.wrappedValue.fill != .none {
+                if binding.wrappedValue.fill == .solid {
                     ColorPicker("Color", selection: colorBinding(binding.color1))
                 }
                 if binding.wrappedValue.fill == .gradient {
-                    ColorPicker("Second color", selection: colorBinding(binding.color2))
+                    GradientEditor(
+                        stops: Binding(
+                            // Older two-colour styles open with their two colours as stops.
+                            get: { binding.wrappedValue.resolvedStops },
+                            set: { binding.wrappedValue.gradientStops = $0 }),
+                        angle: binding.gradientAngle)
                 }
             }
 

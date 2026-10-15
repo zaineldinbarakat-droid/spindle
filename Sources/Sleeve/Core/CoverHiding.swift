@@ -2,24 +2,21 @@ import AppKit
 import Combine
 import SwiftUI
 
-/// How hidden icons are hidden on macOS 27 when native hiding is off or unavailable,
-/// and how macOS's own icons (which native hiding always keeps) are hidden when it's on.
+/// The fallback for hiding icons on macOS 27, used when native hiding is off or
+/// unavailable — and for Apple's own icons, which native hiding always keeps.
 ///
-/// Every menu bar manager before macOS 27 hid icons by stretching a divider item to
-/// 10 000 pt so it shoved its neighbours off the screen. macOS 27 moved status item
-/// layout into MenuBarAgent, which caps item width, so the divider no longer pushes
-/// anything anywhere (measured: an icon "behind" a 10 000 pt divider moved 20 pt).
-/// The real layout now lives in a protected container no third-party app can write.
+/// It lays a clean capsule over each stretch of hidden icons: frosted glass, a quiet
+/// "•••" to say something is tucked away there, and a click reveals it. The icons
+/// keep their space in the bar, which is why native hiding is preferred.
 ///
-/// So on 27+, Sleeve covers the hidden stretch of the bar instead: a panel just above
-/// the status icons that paints exactly what the empty menu bar would look like there —
-/// the wallpaper, cropped and scaled the way the desktop shows it, plus any Sleeve
-/// style — and swallows clicks (a click on it reveals). Icons keep their space in the
-/// bar, but they're out of sight and out of the way.
+/// An earlier version painted the desktop wallpaper into the cover so it would vanish
+/// into the bar. Reading the wallpaper file froze Sleeve when it lived in a protected
+/// folder (here, ~/Downloads): macOS put up a folder-access prompt and the main thread
+/// waited on it. The cover now touches no files at all.
 @MainActor
 final class CoverController {
-    private var panel: NSPanel?
-    private let model = CoverModel()
+    private var panels: [NSPanel] = []
+    private let models: [CoverModel] = (0..<8).map { _ in CoverModel() }
     private unowned let sections: SectionManager
     private let settings = SleeveSettings.shared
     private var cancellables = Set<AnyCancellable>()
@@ -36,92 +33,68 @@ final class CoverController {
         settings.$appearance
             .sink { [weak self] _ in DispatchQueue.main.async { self?.update() } }
             .store(in: &cancellables)
-        // The wallpaper differs per Space; re-read it whenever the Space changes.
-        NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.activeSpaceDidChangeNotification)
-            .sink { [weak self] _ in self?.model.wallpaperKey = nil; self?.update() }
-            .store(in: &cancellables)
         NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)
-            .sink { [weak self] _ in self?.model.wallpaperKey = nil; self?.update() }
+            .sink { [weak self] _ in self?.update() }
             .store(in: &cancellables)
     }
 
-    /// The stretch of bar to cover for the current reveal state, in global AppKit
-    /// coordinates, or nil when nothing needs covering.
-    private func coveredRange() -> ClosedRange<CGFloat>? {
-        // Everything hidden when covering is the method; with native hiding, only
-        // macOS's own items, which the native restriction always keeps.
-        let hiddenItems = sections.itemsNeedingCover()
-        guard !hiddenItems.isEmpty, let screen = NSScreen.screens.first else { return nil }
+    /// Contiguous stretches of icons to cover, left to right, in global AppKit x.
+    /// Icons that stay visible split the stretches, so they're never covered.
+    private func coveredRuns() -> [ClosedRange<CGFloat>] {
+        let covered = sections.itemsNeedingCover()
+        guard !covered.isEmpty else { return [] }
+        let coveredIDs = Set(covered.map(\.id))
+        let visible = sections.items.filter { !coveredIDs.contains($0.id) && !$0.isOverflowed && sections.isLive($0) }
 
-        var minX = hiddenItems.map(\.frame.minX).min() ?? 0
-        var maxX = hiddenItems.map(\.frame.maxX).max() ?? 0
-        // When covering everything, include our own dividers, which sit at the right
-        // end of each hidden stretch, so the cover is one tidy strip.
-        if sections.method == .cover {
-            if sections.state == .collapsed, let divider = sections.dividerFrame { maxX = max(maxX, divider.maxX) }
-            if let always = sections.alwaysDividerFrame { maxX = max(maxX, always.maxX) }
+        var runs: [ClosedRange<CGFloat>] = []
+        for item in covered.sorted(by: { $0.frame.minX < $1.frame.minX }) {
+            let range = (item.frame.minX - 2)...(item.frame.maxX + 2)
+            if let last = runs.last,
+               !visible.contains(where: { $0.frame.midX > last.upperBound && $0.frame.midX < range.lowerBound }) {
+                runs[runs.count - 1] = last.lowerBound...max(last.upperBound, range.upperBound)
+            } else {
+                runs.append(range)
+            }
         }
-        minX = max(minX - 2, screen.frame.minX)
-        maxX = min(maxX + 1, sections.toggleFrame?.minX ?? maxX)
-        guard maxX > minX else { return nil }
-        return minX...maxX
+        return Array(runs.prefix(models.count))
     }
 
     func update() {
-        guard let range = coveredRange(), let screen = NSScreen.screens.first else {
-            hide()
-            return
-        }
+        guard let screen = NSScreen.screens.first else { return hideAll() }
+        let runs = coveredRuns()
         let strip = MenuBarGeometry.strip(of: screen)
-        let frame = CGRect(x: range.lowerBound, y: strip.minY, width: range.upperBound - range.lowerBound,
-                           height: strip.height)
 
-        refreshWallpaper(for: screen)
-        model.screenFrame = screen.frame
-        model.coverFrame = frame
-        model.barHeight = strip.height
-        model.style = settings.appearance.style(for: screen, isDark: SystemAppearance.isDark)
-
-        let panel = self.panel ?? makePanel()
-        self.panel = panel
-        panel.setFrame(frame, display: true)
-        if !panel.isVisible {
-            panel.alphaValue = 0
-            panel.orderFrontRegardless()
-        }
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.18
-            panel.animator().alphaValue = 1
-        }
-    }
-
-    private func hide() {
-        guard let panel, panel.isVisible else { return }
-        NSAnimationContext.runAnimationGroup({ context in
-            context.duration = 0.18
-            panel.animator().alphaValue = 0
-        }, completionHandler: {
-            Task { @MainActor in
-                // Re-check: a re-hide may have arrived during the fade.
-                if self.coveredRange() == nil { panel.orderOut(nil) }
+        for (index, run) in runs.enumerated() {
+            let frame = CGRect(x: run.lowerBound, y: strip.minY, width: run.upperBound - run.lowerBound,
+                               height: strip.height)
+            let panel = index < panels.count ? panels[index] : makePanel(model: models[index])
+            if index >= panels.count { panels.append(panel) }
+            models[index].size = frame.size
+            panel.setFrame(frame, display: true)
+            if !panel.isVisible {
+                panel.alphaValue = 0
+                panel.orderFrontRegardless()
             }
-        })
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.2
+                panel.animator().alphaValue = 1
+            }
+        }
+        for panel in panels.dropFirst(runs.count) where panel.isVisible {
+            NSAnimationContext.runAnimationGroup({ context in
+                context.duration = 0.18
+                panel.animator().alphaValue = 0
+            }, completionHandler: {
+                Task { @MainActor in panel.orderOut(nil) }
+            })
+        }
     }
 
-    private func refreshWallpaper(for screen: NSScreen) {
-        let url = NSWorkspace.shared.desktopImageURL(for: screen)
-        let key = url?.path ?? "none"
-        guard model.wallpaperKey != key else { return }
-        model.wallpaperKey = key
-        model.wallpaper = url.flatMap { NSImage(contentsOf: $0) }
-        let options = NSWorkspace.shared.desktopImageOptions(for: screen) ?? [:]
-        model.fillColor = (options[.fillColor] as? NSColor).map(Color.init) ?? .black
-        let scaling = (options[.imageScaling] as? NSNumber).map { NSImageScaling(rawValue: $0.uintValue) }
-        model.fitsInsteadOfFills = scaling == .scaleProportionallyUpOrDown
-            && (options[.allowClipping] as? Bool) == false
+    private func hideAll() {
+        panels.forEach { $0.orderOut(nil) }
     }
 
-    private func makePanel() -> NSPanel {
+    private func makePanel(model: CoverModel) -> NSPanel {
         let panel = CoverPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel],
                                backing: .buffered, defer: false)
         panel.isOpaque = false
@@ -138,7 +111,7 @@ final class CoverController {
     }
 
     func tearDown() {
-        panel?.orderOut(nil)
+        hideAll()
     }
 }
 
@@ -149,63 +122,44 @@ private final class CoverPanel: NSPanel {
 
 @MainActor
 final class CoverModel: ObservableObject {
-    @Published var wallpaper: NSImage?
-    var wallpaperKey: String?
-    @Published var fillColor: Color = .black
-    @Published var fitsInsteadOfFills = false
-    @Published var screenFrame: CGRect = .zero
-    @Published var coverFrame: CGRect = .zero
-    @Published var barHeight: CGFloat = 24
-    @Published var style = MenuBarStyle()
+    @Published var size: CGSize = .zero
 }
 
-/// The wallpaper, laid out at full screen size exactly as the desktop shows it, then
-/// shifted so only the covered slice shows; the Sleeve style goes on top so a styled
-/// bar stays seamless across the cover.
+/// A frosted capsule the height of an icon, with three dots in the middle.
 private struct CoverView: View {
     @ObservedObject var model: CoverModel
     var onClick: () -> Void
+    @State private var hovering = false
 
     var body: some View {
-        let offsetX = model.screenFrame.minX - model.coverFrame.minX
-        ZStack(alignment: .topLeading) {
-            model.fillColor
+        let height = min(max(model.size.height - 10, 16), 24)
+        let capsule = Capsule(style: .continuous)
 
-            if let wallpaper = model.wallpaper {
-                Image(nsImage: wallpaper)
-                    .resizable()
-                    .aspectRatio(contentMode: model.fitsInsteadOfFills ? .fit : .fill)
-                    .frame(width: model.screenFrame.width, height: model.screenFrame.height)
-                    .clipped()
-                    .offset(x: offsetX)
-            } else {
-                // No readable wallpaper (some dynamic/aerial ones): blur what's behind.
-                VisualEffectBlur()
+        ZStack {
+            Group {
+                if #available(macOS 26, *) {
+                    // Opaque enough that nothing underneath shows through.
+                    Color.clear.glassEffect(.regular.tint(Color(nsColor: .windowBackgroundColor).opacity(0.85)), in: capsule)
+                } else {
+                    capsule.fill(.regularMaterial)
+                        .overlay(capsule.fill(Color(nsColor: .windowBackgroundColor).opacity(0.75)))
+                }
             }
+            .overlay(capsule.strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5))
 
-            if !model.style.isEmpty {
-                MenuBarStyleView(style: model.style, layout: BarLayout(
-                    size: CGSize(width: model.screenFrame.width, height: model.barHeight),
-                    barHeight: model.barHeight,
-                    appMenusEnd: 0, statusStart: model.coverFrame.minX - model.screenFrame.minX,
-                    notch: nil))
-                    .offset(x: offsetX)
+            HStack(spacing: 3) {
+                ForEach(0..<3, id: \.self) { _ in
+                    Circle().frame(width: 3.5, height: 3.5)
+                }
             }
+            .foregroundStyle(Color.primary.opacity(hovering ? 0.75 : 0.45))
         }
-        .frame(width: model.coverFrame.width, height: model.coverFrame.height, alignment: .topLeading)
-        .clipped()
+        .frame(width: max(model.size.width - 4, height), height: height)
+        .frame(width: model.size.width, height: model.size.height)
         .contentShape(Rectangle())
+        .onHover { hovering = $0 }
+        .animation(.easeOut(duration: 0.15), value: hovering)
         .onTapGesture(perform: onClick)
+        .help("Hidden by Sleeve — click to show")
     }
-}
-
-private struct VisualEffectBlur: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSVisualEffectView {
-        let view = NSVisualEffectView()
-        view.material = .menu
-        view.blendingMode = .behindWindow
-        view.state = .active
-        return view
-    }
-    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
 }
