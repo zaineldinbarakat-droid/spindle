@@ -49,10 +49,16 @@ assemble() {
         /usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string AppIcon" "$app/Contents/Info.plist" 2>/dev/null || true
     fi
 
-    # Ad-hoc signature. Good enough to launch, but the code directory hash changes on
-    # every build, so macOS re-asks for Automation (Spindle) and Accessibility (Sleeve)
-    # each time you rebuild. A real Developer ID certificate makes grants stick.
-    codesign --force --sign - --timestamp=none "$app" >/dev/null 2>&1 || {
+    # Ad-hoc signature with an explicit designated requirement. By default an ad-hoc
+    # signature's requirement is its cdhash, which changes on every build, so a
+    # privacy grant (Accessibility for Sleeve, Automation for Spindle) silently
+    # stopped matching the next build — the switch in System Settings stayed on but
+    # the app still wasn't trusted. Pinning the requirement to the bundle identifier
+    # keeps one grant valid across rebuilds.
+    local bundle_id
+    bundle_id="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Contents/Info.plist")"
+    codesign --force --sign - --timestamp=none \
+        --requirements "=designated => identifier \"$bundle_id\"" "$app" >/dev/null 2>&1 || {
         echo "warning: ad-hoc signing failed for $name; the app will still run" >&2
     }
     echo "Built: $app"

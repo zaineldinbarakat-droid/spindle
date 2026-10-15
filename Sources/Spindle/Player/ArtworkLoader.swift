@@ -37,35 +37,58 @@ actor ArtworkLoader {
         return result
     }
 
-    /// Average the cover down to a single pixel, then push saturation up so that muted
-    /// covers still produce a colour rather than a grey smudge.
+    /// The cover's dominant colour.
+    ///
+    /// Averaging every pixel (the old approach) turns any cover with two strong colours
+    /// into the mud between them — a blue night sky over an orange desert came out dark
+    /// red. Instead: shrink to 32×32, sort the colourful pixels into hue buckets, and
+    /// take the bucket with the most colour in it. Near-black and near-white pixels
+    /// don't vote; a cover with no colour at all falls back to its average, kept grey.
     private static func accentColor(from image: NSImage, context: CIContext) -> NSColor {
-        guard let tiff = image.tiffRepresentation,
-              let ciImage = CIImage(data: tiff) else { return .systemPink }
+        guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+            return .systemPink
+        }
+        let side = 32
+        var pixels = [UInt8](repeating: 0, count: side * side * 4)
+        guard let bitmap = CGContext(data: &pixels, width: side, height: side, bitsPerComponent: 8,
+                                     bytesPerRow: side * 4, space: CGColorSpaceCreateDeviceRGB(),
+                                     bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else {
+            return .systemPink
+        }
+        bitmap.interpolationQuality = .medium
+        bitmap.draw(cgImage, in: CGRect(x: 0, y: 0, width: side, height: side))
 
-        let extent = ciImage.extent
-        guard let filter = CIFilter(name: "CIAreaAverage", parameters: [
-            kCIInputImageKey: ciImage,
-            kCIInputExtentKey: CIVector(cgRect: extent)
-        ]), let output = filter.outputImage else { return .systemPink }
+        let bucketCount = 18
+        var weight = [CGFloat](repeating: 0, count: bucketCount)
+        var sums = [(r: CGFloat, g: CGFloat, b: CGFloat)](repeating: (0, 0, 0), count: bucketCount)
+        var average: (r: CGFloat, g: CGFloat, b: CGFloat) = (0, 0, 0)
 
-        var bitmap = [UInt8](repeating: 0, count: 4)
-        context.render(output,
-                       toBitmap: &bitmap,
-                       rowBytes: 4,
-                       bounds: CGRect(x: 0, y: 0, width: 1, height: 1),
-                       format: .RGBA8,
-                       colorSpace: CGColorSpaceCreateDeviceRGB())
+        for i in stride(from: 0, to: pixels.count, by: 4) {
+            let r = CGFloat(pixels[i]) / 255, g = CGFloat(pixels[i + 1]) / 255, b = CGFloat(pixels[i + 2]) / 255
+            average.r += r; average.g += g; average.b += b
+            let color = NSColor(srgbRed: r, green: g, blue: b, alpha: 1)
+            let saturation = color.saturationComponent, brightness = color.brightnessComponent
+            guard saturation > 0.22, brightness > 0.18 else { continue }
+            let bucket = min(Int(color.hueComponent * CGFloat(bucketCount)), bucketCount - 1)
+            // Vivid pixels count for more than washed-out ones of the same hue.
+            let w = saturation * (0.4 + brightness)
+            weight[bucket] += w
+            sums[bucket].r += r * w; sums[bucket].g += g * w; sums[bucket].b += b * w
+        }
 
-        let base = NSColor(srgbRed: CGFloat(bitmap[0]) / 255,
-                           green: CGFloat(bitmap[1]) / 255,
-                           blue: CGFloat(bitmap[2]) / 255,
-                           alpha: 1)
+        let count = CGFloat(side * side)
+        guard let best = weight.indices.max(by: { weight[$0] < weight[$1] }), weight[best] > count * 0.02 else {
+            // Black-and-white or near-grey cover: a neutral accent, not an invented hue.
+            let grey = (average.r + average.g + average.b) / (3 * count)
+            return NSColor(white: max(min(grey * 1.3, 0.8), 0.45), alpha: 1)
+        }
 
-        guard let hsb = base.usingColorSpace(.sRGB) else { return base }
-        return NSColor(hue: hsb.hueComponent,
-                       saturation: min(hsb.saturationComponent * 1.6 + 0.15, 1),
-                       brightness: max(min(hsb.brightnessComponent * 1.25, 0.95), 0.45),
+        let w = weight[best]
+        let dominant = NSColor(srgbRed: sums[best].r / w, green: sums[best].g / w, blue: sums[best].b / w, alpha: 1)
+        // Normalise so dark covers still glow and pale ones still read as a colour.
+        return NSColor(hue: dominant.hueComponent,
+                       saturation: min(max(dominant.saturationComponent * 1.15, 0.45), 0.95),
+                       brightness: max(min(dominant.brightnessComponent * 1.2, 0.95), 0.55),
                        alpha: 1)
     }
 }
