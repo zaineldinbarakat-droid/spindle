@@ -2,9 +2,8 @@
 //
 //   swift Packaging/make-icons.swift
 //
-// Each icon is a 3D emoji from Microsoft's Fluent Emoji (MIT, see Packaging/emoji/) on a
-// macOS tile — an 824 pt continuous-corner squircle on a 1024 pt canvas. Apple's own
-// emoji artwork can't be used in an app icon; Fluent's can.
+// Both are drawn in code on the macOS icon grid — an 824 pt continuous-corner tile on
+// a 1024 pt canvas.
 import AppKit
 import SwiftUI
 
@@ -34,36 +33,105 @@ struct Tile<Content: View>: View {
     }
 }
 
-// MARK: - Emoji icons
-
-struct Emoji: View {
-    var file: String
+struct Record: View {
     var size: CGFloat
+    var label: [Color]
 
     var body: some View {
-        if let image = NSImage(contentsOf: packaging.appendingPathComponent("emoji/\(file)")) {
-            Image(nsImage: image)
-                .resizable()
-                .interpolation(.high)
-                .aspectRatio(contentMode: .fit)
-                .frame(width: size, height: size)
-                .shadow(color: .black.opacity(0.28), radius: 24, y: 16)
+        ZStack {
+            Circle().fill(RadialGradient(colors: [Color(white: 0.18), Color(white: 0.04)],
+                                         center: .center, startRadius: size * 0.1, endRadius: size * 0.5))
+            // Grooves.
+            ForEach(0..<9) { i in
+                Circle()
+                    .stroke(Color.white.opacity(i % 2 == 0 ? 0.07 : 0.035), lineWidth: size * 0.006)
+                    .frame(width: size * (0.92 - CGFloat(i) * 0.055), height: size * (0.92 - CGFloat(i) * 0.055))
+            }
+            // Two-lobed sheen, the look of a glossy record under a lamp.
+            Circle().fill(AngularGradient(gradient: Gradient(stops: [
+                .init(color: .white.opacity(0), location: 0),
+                .init(color: .white.opacity(0.22), location: 0.12),
+                .init(color: .white.opacity(0), location: 0.25),
+                .init(color: .white.opacity(0), location: 0.5),
+                .init(color: .white.opacity(0.16), location: 0.62),
+                .init(color: .white.opacity(0), location: 0.75),
+                .init(color: .white.opacity(0), location: 1)
+            ]), center: .center))
+            Circle().fill(LinearGradient(colors: label, startPoint: .topLeading, endPoint: .bottomTrailing))
+                .frame(width: size * 0.36, height: size * 0.36)
+                .overlay(Circle().stroke(Color.black.opacity(0.25), lineWidth: size * 0.008))
+            Circle().fill(Color(white: 0.1)).frame(width: size * 0.045, height: size * 0.045)
         }
+        .frame(width: size, height: size)
+        .shadow(color: .black.opacity(0.45), radius: size * 0.04, y: size * 0.02)
     }
 }
+
+// MARK: - Spindle: a record on a walnut tile, tonearm resting on it
 
 struct SpindleIcon: View {
     var body: some View {
         Tile(colors: [Color(red: 0.45, green: 0.28, blue: 0.16), Color(red: 0.20, green: 0.11, blue: 0.06)]) {
-            Emoji(file: "optical_disk_3d.png", size: 560)
+            ZStack {
+                Record(size: 600, label: [Color(red: 1.0, green: 0.62, blue: 0.28),
+                                          Color(red: 0.93, green: 0.30, blue: 0.38)])
+                    .offset(x: -40, y: 30)
+                Tonearm().offset(x: 185, y: -120)
+            }
         }
     }
 }
 
-struct SleeveIcon: View {
+struct Tonearm: View {
     var body: some View {
-        Tile(colors: [Color(red: 0.80, green: 0.76, blue: 1.00), Color(red: 0.45, green: 0.38, blue: 0.90)]) {
-            Emoji(file: "eyes_3d.png", size: 580).offset(y: 6)
+        ZStack(alignment: .topTrailing) {
+            // Arm: from the pivot, angled down-left onto the record.
+            Capsule()
+                .fill(LinearGradient(colors: [Color(white: 0.95), Color(white: 0.62)],
+                                     startPoint: .top, endPoint: .bottom))
+                .frame(width: 26, height: 420)
+                .rotationEffect(.degrees(24), anchor: .top)
+                .offset(x: -40, y: 40)
+            // Headshell.
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color(white: 0.22))
+                .frame(width: 58, height: 80)
+                .rotationEffect(.degrees(24))
+                .offset(x: -205, y: 410)
+            // Pivot.
+            Circle()
+                .fill(RadialGradient(colors: [Color(white: 0.95), Color(white: 0.55)],
+                                     center: .topLeading, startRadius: 0, endRadius: 90))
+                .frame(width: 110, height: 110)
+                .overlay(Circle().fill(Color(white: 0.35)).frame(width: 34, height: 34))
+        }
+        .frame(width: 300, height: 520, alignment: .topTrailing)
+        .shadow(color: .black.opacity(0.4), radius: 12, y: 8)
+    }
+}
+
+// MARK: - Sleeve: a menu bar, half tucked away
+
+/// Flat and quiet on purpose: a white menu-bar capsule with a divider — faded dots
+/// for the apps Sleeve keeps hidden, solid dots for the ones on show.
+struct SleeveIcon: View {
+    private let violet = Color(red: 0.42, green: 0.33, blue: 0.93)
+
+    var body: some View {
+        Tile(colors: [Color(red: 0.62, green: 0.55, blue: 1.00), Color(red: 0.38, green: 0.29, blue: 0.88)]) {
+            ZStack {
+                Capsule(style: .continuous)
+                    .fill(Color.white)
+                    .frame(width: 620, height: 190)
+                    .shadow(color: Color(red: 0.15, green: 0.1, blue: 0.45).opacity(0.35), radius: 30, y: 18)
+                HStack(spacing: 44) {
+                    Circle().fill(violet.opacity(0.22)).frame(width: 64, height: 64)
+                    Circle().fill(violet.opacity(0.22)).frame(width: 64, height: 64)
+                    Capsule().fill(violet.opacity(0.35)).frame(width: 10, height: 96)
+                    Circle().fill(violet).frame(width: 64, height: 64)
+                    Circle().fill(violet).frame(width: 64, height: 64)
+                }
+            }
         }
     }
 }

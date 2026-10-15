@@ -134,10 +134,10 @@ Access** (there is no public Focus API). Each is asked for only when a feature n
 
 ## App icons
 
-Each icon is a 3D emoji from Microsoft's [Fluent Emoji](https://github.com/microsoft/fluentui-emoji)
-(MIT; licence in `Packaging/emoji/`) — 💿 for Spindle, 👀 for Sleeve — on a macOS tile,
-composed by `Packaging/make-icons.swift` (run it with `swift` to regenerate the `.icns`
-files); `build.sh` bundles them.
+Both icons are drawn in code by `Packaging/make-icons.swift` (run it with `swift` to
+regenerate the `.icns` files): Spindle's vinyl on a walnut tile, and Sleeve's flat
+menu-bar capsule — faded dots for the hidden apps, solid ones for those on show.
+`build.sh` bundles them.
 
 ## Updates
 
