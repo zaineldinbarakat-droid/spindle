@@ -2,7 +2,8 @@ import AppKit
 import Combine
 import SwiftUI
 
-/// How hidden icons are hidden on macOS 27 and later.
+/// How hidden icons are hidden on macOS 27 when native hiding is off or unavailable,
+/// and how macOS's own icons (which native hiding always keeps) are hidden when it's on.
 ///
 /// Every menu bar manager before macOS 27 hid icons by stretching a divider item to
 /// 10 000 pt so it shoved its neighbours off the screen. macOS 27 moved status item
@@ -47,22 +48,19 @@ final class CoverController {
     /// The stretch of bar to cover for the current reveal state, in global AppKit
     /// coordinates, or nil when nothing needs covering.
     private func coveredRange() -> ClosedRange<CGFloat>? {
-        let hiddenItems: [MenuBarItem]
-        switch sections.state {
-        case .collapsed:
-            hiddenItems = sections.items(in: .hidden) + sections.items(in: .alwaysHidden)
-        case .hidden:
-            hiddenItems = sections.items(in: .alwaysHidden)
-        case .all:
-            hiddenItems = []
-        }
+        // Everything hidden when covering is the method; with native hiding, only
+        // macOS's own items, which the native restriction always keeps.
+        let hiddenItems = sections.itemsNeedingCover()
         guard !hiddenItems.isEmpty, let screen = NSScreen.screens.first else { return nil }
 
         var minX = hiddenItems.map(\.frame.minX).min() ?? 0
         var maxX = hiddenItems.map(\.frame.maxX).max() ?? 0
-        // Include our own dividers, which sit at the right end of each hidden stretch.
-        if sections.state == .collapsed, let divider = sections.dividerFrame { maxX = max(maxX, divider.maxX) }
-        if let always = sections.alwaysDividerFrame { maxX = max(maxX, always.maxX) }
+        // When covering everything, include our own dividers, which sit at the right
+        // end of each hidden stretch, so the cover is one tidy strip.
+        if sections.method == .cover {
+            if sections.state == .collapsed, let divider = sections.dividerFrame { maxX = max(maxX, divider.maxX) }
+            if let always = sections.alwaysDividerFrame { maxX = max(maxX, always.maxX) }
+        }
         minX = max(minX - 2, screen.frame.minX)
         maxX = min(maxX + 1, sections.toggleFrame?.minX ?? maxX)
         guard maxX > minX else { return nil }

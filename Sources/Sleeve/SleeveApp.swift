@@ -51,7 +51,7 @@ final class SleeveAppDelegate: NSObject, NSApplicationDelegate {
 
             _ = env.automation
             env.overlay.refresh()
-            if SectionManager.usesCoverHiding {
+            if SectionManager.isModernMenuBar {
                 env.cover.onClick = {
                     env.settings.useSleeveBar ? env.bar.open() : env.sections.reveal(.hidden)
                 }
@@ -61,7 +61,7 @@ final class SleeveAppDelegate: NSObject, NSApplicationDelegate {
             HotkeyCenter.shared.handler = { action in
                 switch action {
                 case .toggleHidden:
-                    env.settings.useSleeveBar ? env.bar.toggle() : env.sections.toggle()
+                    (env.settings.useSleeveBar && !env.settings.hideAllApps) ? env.bar.toggle() : env.sections.toggle()
                 case .showAll:
                     env.settings.useSleeveBar ? env.bar.toggle(includeAlwaysHidden: true) : env.sections.toggleAll()
                 case .search: env.search.toggle()
@@ -74,9 +74,9 @@ final class SleeveAppDelegate: NSObject, NSApplicationDelegate {
                 .sink { HotkeyCenter.shared.register($0) }
                 .store(in: &cancellables)
 
-            // First run without the Accessibility grant: show Settings, which explains it.
-            if !AXIsProcessTrusted() && !UserDefaults.standard.bool(forKey: "didShowWelcome") {
-                UserDefaults.standard.set(true, forKey: "didShowWelcome")
+            // Without the Accessibility grant Sleeve can't hide anything, so say so at
+            // every launch until it's fixed — Settings explains and has the fix button.
+            if !AXIsProcessTrusted() {
                 SleeveSettingsWindow.show()
             }
         }

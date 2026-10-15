@@ -89,17 +89,14 @@ private struct PermissionBanner: View {
             Image(systemName: "hand.raised.fill").foregroundStyle(.orange)
             VStack(alignment: .leading, spacing: 3) {
                 Text("Sleeve needs Accessibility access").font(.headline)
-                Text("It's how Sleeve sees which icons are where. If Sleeve is already listed and switched on but this message stays, an older build's entry is in the way: select Sleeve in the list, click −, then click Grant Access again.")
+                Text("Click Fix Permission, then switch Sleeve on in the list that opens. If Sleeve was already listed and on, that entry belonged to an older build — Fix Permission clears it first. This message disappears by itself once it works.")
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 6) {
-                Button("Grant Access…") {
-                    let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
-                    AXIsProcessTrustedWithOptions(options)
-                    NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
-                }
+                Button("Fix Permission…") { AccessibilityPermission.fix() }
+                    .buttonStyle(.borderedProminent)
                 Button("Restart Sleeve") { SleeveRelauncher.relaunch() }
                     .help("Some macOS versions only notice a new grant after a restart")
             }
@@ -113,10 +110,18 @@ private struct PermissionBanner: View {
 
 private struct GeneralTab: View {
     @EnvironmentObject private var settings: SleeveSettings
+    @EnvironmentObject private var sections: SectionManager
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
 
     var body: some View {
         Form {
+            Section("What to hide") {
+                Toggle("Hide all app icons until I hover over the menu bar", isOn: $settings.hideAllApps)
+                Text(settings.hideAllApps
+                     ? "Like Ice: the bar shows only Sleeve and Apple's own icons until the cursor reaches the right side of the menu bar. Pick apps to always keep visible under Layout."
+                     : "Only icons you ⌘-drag into the Hidden sections are hidden.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             Section("Toggle") {
                 Picker("Icon", selection: $settings.toggleIcon) {
                     ForEach(SleeveSettings.ToggleIcon.allCases) { Text($0.title).tag($0) }
@@ -125,6 +130,22 @@ private struct GeneralTab: View {
                 Toggle("Show hidden icons in the Sleeve Bar (recommended on notched Macs)", isOn: $settings.useSleeveBar)
                 Text("Click the toggle to reveal · ⌥-click shows Always Hidden too · right-click for the menu")
                     .font(.caption).foregroundStyle(.secondary)
+            }
+            if SectionManager.isModernMenuBar {
+                Section("Hiding on macOS 27") {
+                    Toggle("Remove hidden icons from the bar (native hiding)", isOn: $settings.useNativeHiding)
+                    LabeledContent("Now using", value: sections.method.title)
+                    if let failure = sections.nativeFailure {
+                        HStack {
+                            Label("Native hiding failed: \(failure). Covering instead.", systemImage: "exclamationmark.triangle")
+                                .foregroundStyle(.orange)
+                            Spacer()
+                            Button("Try Again") { sections.retryNativeHiding() }
+                        }
+                    }
+                    Text("Native hiding uses the private macOS feature behind exam mode, so the bar reflows and hidden icons free up space. It works per app (an app's icons hide together) and always keeps Apple's own icons, which Sleeve covers instead. A macOS update could break it; Sleeve then falls back to covering.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
             }
             Section("Also reveal when") {
                 Toggle("Hovering over an empty part of the menu bar", isOn: $settings.revealOnHover)
@@ -167,11 +188,21 @@ private struct LayoutTab: View {
     @State private var usesDefaultSpacing = MenuBarSpacing.current == nil
     @State private var confirmRelaunch = false
 
+    @EnvironmentObject private var settings: SleeveSettings
+
     var body: some View {
+        if settings.hideAllApps {
+            AlwaysShownList()
+        } else {
+            sectionsLayout
+        }
+    }
+
+    private var sectionsLayout: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if SectionManager.usesCoverHiding {
+            if SectionManager.isModernMenuBar {
                 Label {
-                    Text("To move an icon, hold **⌘** and drag it in the menu bar itself: left of the first faint │ next to Sleeve's icon is **Hidden**, left of the second is **Always Hidden**. macOS 27 doesn't let apps move other apps' icons, so dragging here can't do it for you.")
+                    Text("To move an icon, hold **⌘** and drag it in the menu bar itself: left of the first faint │ next to Sleeve's icon is **Hidden**, left of the second is **Always Hidden**. macOS 27 doesn't let apps move other apps' icons, so dragging here can't do it for you. With native hiding an app's icons hide together, in the most visible section any of them is in.")
                 } icon: {
                     Image(systemName: "command")
                 }
@@ -228,7 +259,7 @@ private struct LayoutTab: View {
     private func move(_ id: String, to section: MenuBarSection) {
         guard let item = sections.items.first(where: { $0.id == id }),
               sections.section(of: item) != section else { return }
-        if SectionManager.usesCoverHiding {
+        if SectionManager.isModernMenuBar {
             error = "On macOS 27, ⌘-drag “\(item.displayName)” in the menu bar itself — apps can't move it for you."
             return
         }
@@ -242,6 +273,57 @@ private struct LayoutTab: View {
             }
             moving = nil
         }
+    }
+}
+
+/// Hide-all mode's layout: every app with a menu bar icon, each with a switch to keep
+/// it visible anyway.
+private struct AlwaysShownList: View {
+    @EnvironmentObject private var settings: SleeveSettings
+    @EnvironmentObject private var sections: SectionManager
+
+    private var apps: [MenuBarItem] {
+        var seen = Set<String>()
+        return sections.items.filter { item in
+            guard !item.isNativeSystemItem, let bundle = item.bundleID,
+                  bundle != Bundle.main.bundleIdentifier else { return false }
+            return seen.insert(bundle).inserted
+        }
+        .sorted { $0.ownerName.localizedCaseInsensitiveCompare($1.ownerName) == .orderedAscending }
+    }
+
+    var body: some View {
+        Form {
+            Section {
+                ForEach(apps) { item in
+                    Toggle(isOn: Binding(
+                        get: { settings.alwaysShownBundles.contains(item.bundleID ?? "") },
+                        set: { keep in
+                            guard let bundle = item.bundleID else { return }
+                            if keep { settings.alwaysShownBundles.append(bundle) }
+                            else { settings.alwaysShownBundles.removeAll { $0 == bundle } }
+                        })) {
+                        HStack(spacing: 8) {
+                            Image(nsImage: item.icon)
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(width: 18, height: 18)
+                            Text(item.ownerName)
+                        }
+                    }
+                }
+                if apps.isEmpty {
+                    Text(AXIsProcessTrusted() ? "No app icons found in the menu bar." : "Sleeve needs Accessibility access to list menu bar icons.")
+                        .foregroundStyle(.secondary)
+                }
+            } header: {
+                Text("Always show")
+            } footer: {
+                Text("Everything else is hidden until you hover over the menu bar. Apple's own icons (clock, Wi-Fi, battery…) always stay.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
     }
 }
 
@@ -438,10 +520,16 @@ private struct HotkeysTab: View {
         Form {
             Section {
                 ForEach(HotkeyAction.allCases) { action in
-                    LabeledContent(action.title) {
+                    LabeledContent {
                         HotkeyRecorder(combo: Binding(
                             get: { settings.hotkeys[action] },
                             set: { settings.hotkeys[action] = $0 }))
+                    } label: {
+                        Text(action.title)
+                        if HotkeyCenter.shared.conflicts.contains(action) {
+                            Text("Another app already uses this shortcut — pick a different one.")
+                                .foregroundStyle(.orange)
+                        }
                     }
                 }
             }

@@ -54,12 +54,18 @@ struct NotchMetrics: Equatable {
     }
 
     /// The area the cursor must reach for the panel to open, in screen coordinates.
+    /// How far the zones reach *above* the screen. Pushed against the top edge, the
+    /// cursor reports y == screenFrame.maxY exactly, which `CGRect.contains` treats
+    /// as outside — so the panel thought the cursor had left, closed, and reopened a
+    /// pixel later. Measured on this Mac: top edge → y 982.0, screen top 982.0.
+    static let overshoot: CGFloat = 8
+
     func hoverZone() -> CGRect {
         let width = notchWidth + Theme.collapsedWingWidth * 2
         return CGRect(x: notchCenterX - width / 2,
                       y: screenFrame.maxY - notchHeight,
                       width: width,
-                      height: notchHeight)
+                      height: notchHeight + Self.overshoot)
     }
 
     /// The little record in the collapsed pill's left wing.
@@ -76,6 +82,6 @@ struct NotchMetrics: Equatable {
         CGRect(x: notchCenterX - Theme.expandedWidth / 2 - 12,
                y: screenFrame.maxY - Theme.expandedHeight - 12,
                width: Theme.expandedWidth + 24,
-               height: Theme.expandedHeight + 12)
+               height: Theme.expandedHeight + 12 + Self.overshoot)
     }
 }

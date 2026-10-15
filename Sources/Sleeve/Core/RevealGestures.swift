@@ -59,6 +59,9 @@ final class RevealGestures {
             return false
         }
         let start = appMenusEnd + 8
+        // Hide-all (Ice-style): the whole right side of the bar is the trigger —
+        // what's left there is just Sleeve and Apple's own icons.
+        if settings.hideAllApps { return point.x > start }
         let end = (sections.leftmostVisibleX ?? screen.frame.maxX) - 8
         return point.x > start && point.x < end
     }
@@ -69,10 +72,12 @@ final class RevealGestures {
     }
 
     private func reveal() {
+        if settings.hideAllApps { return sections.reveal(.all) }
         if settings.useSleeveBar { showBar?() } else { sections.reveal(.hidden) }
     }
 
     private func conceal() {
+        if settings.hideAllApps { return sections.collapse() }
         if settings.useSleeveBar { hideBar?() } else { sections.collapse() }
     }
 
@@ -93,7 +98,7 @@ final class RevealGestures {
             if self.isOverEmptyBar(NSEvent.mouseLocation) { self.reveal() }
         }
         hoverWork = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: work)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: work)
     }
 
     private func scrolled(_ dy: CGFloat) {

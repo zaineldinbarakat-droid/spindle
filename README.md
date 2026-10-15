@@ -53,7 +53,11 @@ Sleeve is a second, separate app in this repo: a free menu bar manager in the sp
 Ice/Bartender, built to sit next to Spindle without the two ever fighting over the top
 of the screen.
 
-- **Three sections.** Visible, Hidden and Always Hidden, separated by Sleeve's toggle and
+- **Hide all apps until hover (default).** Like Ice: the menu bar shows only Sleeve and
+  Apple's own icons; move the cursor to the right side of the bar and every app icon
+  comes back, move away and they tuck away again. Pick apps to always keep visible under
+  *Settings → Layout*.
+- **Three sections** (with hide-all off). Visible, Hidden and Always Hidden, separated by Sleeve's toggle and
   two faint │ dividers. ⌘-drag icons across the dividers. On macOS 14–26 you can also
   drag them between the columns in *Settings → Layout* and Sleeve performs the ⌘-drag
   for you; macOS 27 ignores synthesized ⌘-drags, so there it's done by hand.
@@ -79,23 +83,21 @@ Default hotkeys are ⌃⌥⌘ + H (hidden), A (all), S (search), Z (Zen), all re
 Every menu bar manager before macOS 27 hid icons by stretching a divider to 10 000 pt so
 it pushed its neighbours off the screen. macOS 27 moved status item layout into a system
 process (MenuBarAgent) that caps item width: measured on this machine, an icon "behind" a
-10 000 pt divider moved 20 pt. The real layout lives in a protected container that third
-party apps can't write.
+10 000 pt divider moved 20 pt. It also ignores synthesized ⌘-drags.
 
-So on macOS 27 Sleeve **covers** the hidden stretch instead: a strip just above the icons
-that paints what the empty bar would look like there — your wallpaper, cropped and scaled
-the way the desktop shows it, plus any Sleeve style — and reveals on click. The icons keep
-their space in the bar but are out of sight and can't be clicked by accident. On macOS
-14–26 Sleeve uses the classic push-off-screen method. macOS 27's own "Show Hidden Menu Bar
-Items" button is always left alone.
+So on macOS 27 Sleeve uses **native hiding**: the private `MenuBarClientCore` restriction
+behind macOS's exam mode (first used by [Hidden Bar](https://github.com/dwarvesf/hidden)).
+Sleeve hands MenuBarAgent an allow-list of apps and macOS removes every other app's icons
+and reflows the bar, so hidden icons really disappear and free their space. The bridge is
+a small Objective-C target (`Sources/MenuBarVisibility`) that resolves everything at
+runtime and catches exceptions, and Sleeve fails open: if the API is missing or errors,
+it releases any restriction and falls back to **covering** — painting the hidden stretch
+with your wallpaper. Limits: native hiding is per app, and Apple's own icons are always
+kept (Sleeve covers those when they're in a hidden section). Verified on macOS 27.0.1:
+the restriction is accepted, the bar reflows, and hover reveal/rehide cycle cleanly.
 
-Known limits on 27: a dynamic or aerial wallpaper may not match the cover exactly (Sleeve
-falls back to a blur), and hidden icons still take up width. Icons macOS itself has
-moved into its overflow (when the bar is full) are left to macOS.
-
-macOS 27 does have a native way to truly remove icons from the bar — the private
-`MenuBarClientCore` restriction behind exam mode, which Hidden Bar uses. Sleeve doesn't
-use it yet: it is a private API that a macOS update could break, and it hides per app.
+On macOS 14–26 Sleeve uses the classic push-off-screen method. macOS 27's own "Show
+Hidden Menu Bar Items" button, and anything macOS has overflowed into it, is left alone.
 
 ### Working with Spindle
 
@@ -106,14 +108,20 @@ Bar out of it. Only one dropdown is open at a time, and Zen mode hides Spindle t
 ### Permissions
 
 Both apps are signed with a requirement pinned to their bundle identifier rather than
-the per-build hash, so a permission granted once keeps working after a rebuild. If an
-older build's entry is still listed in Privacy & Security → Accessibility, remove it
-(−) and grant again once.
+the per-build hash, so a permission granted once keeps working after a rebuild. An entry
+left over from an older build stays switched on but no longer matches; Sleeve's
+**Fix Permission** button clears its own entry (`tccutil reset Accessibility
+com.spindle.sleeve`) and asks again, and Sleeve picks the grant up without a restart.
 
 
 Sleeve needs **Accessibility** (to see, click and rearrange icons). Wi-Fi rules need
 **Location** (macOS hides network names otherwise) and Focus rules need **Full Disk
 Access** (there is no public Focus API). Each is asked for only when a feature needs it.
+
+## App icons
+
+Both icons are drawn in code by `Packaging/make-icons.swift` (run it with `swift` to
+regenerate `Spindle.icns` and `Sleeve.icns`); `build.sh` bundles them.
 
 ## Requirements
 
@@ -232,8 +240,6 @@ Honest list, so nothing here is a surprise:
 - **A real spectrum analyser.** The collapsed-view visualizer is decorative motion from
   layered sine waves. Reading actual system audio needs a loopback device or an audio
   tap, which a passive widget has no business installing.
-- **App icons.** Drop `Spindle.icns` / `Sleeve.icns` into `Packaging/` and `build.sh`
-  picks them up.
 - **Sleeve per-Space and per-Focus styles.** macOS has no public API for the current
   Space, and Focus filters need an App Intents extension that SwiftPM can't build.
   Styles switch per light/dark mode and per display.

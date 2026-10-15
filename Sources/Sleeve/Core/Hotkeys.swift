@@ -103,6 +103,8 @@ final class HotkeyCenter {
     var handler: ((HotkeyAction) -> Void)?
 
     private var registered: [EventHotKeyRef] = []
+    /// Shortcuts another app already owns; shown in Settings.
+    private(set) var conflicts: Set<HotkeyAction> = []
     private var actionsByID: [UInt32: HotkeyAction] = [:]
     private var eventHandler: EventHandlerRef?
 
@@ -113,6 +115,7 @@ final class HotkeyCenter {
         registered.forEach { UnregisterEventHotKey($0) }
         registered.removeAll()
         actionsByID.removeAll()
+        conflicts.removeAll()
 
         for (index, action) in HotkeyAction.allCases.enumerated() {
             guard let combo = combos[action] else { continue }
@@ -124,6 +127,10 @@ final class HotkeyCenter {
             if status == noErr, let ref {
                 registered.append(ref)
                 actionsByID[id] = action
+            } else {
+                // Usually eventHotKeyExistsErr: another app registered this chord first.
+                conflicts.insert(action)
+                NSLog("Sleeve: couldn't register \(combo.displayString) for \(action.title) (status \(status))")
             }
         }
     }

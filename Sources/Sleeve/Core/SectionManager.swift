@@ -12,21 +12,25 @@ enum MenuBarSection: String, CaseIterable, Identifiable {
         case .alwaysHidden: return "Always Hidden"
         }
     }
+    /// Lower is more visible; an app with icons in several sections takes the lowest.
+    var rank: Int {
+        switch self {
+        case .visible: return 0
+        case .hidden: return 1
+        case .alwaysHidden: return 2
+        }
+    }
 }
 
 /// Owns Sleeve's three control items and the hide/reveal state.
 ///
 /// The menu bar, right to left, looks like:
 ///
-///     clock … [visible items] ‹toggle› ‹divider› [hidden items] ‹always divider› [always hidden]
+///     clock … [visible items] ‹toggle› │ [hidden items] │ [always hidden]
 ///
-/// Up to macOS 26, hiding is done the way every menu bar manager since Hidden Bar does
-/// it: a divider's length is set to 10 000 pt, which shoves everything to its left off
-/// the screen. macOS 27 caps item width, so there the dividers stay small and
-/// `CoverController` paints over the hidden stretch instead.
-///
-/// Either way the user decides what goes where by ⌘-dragging icons across the
-/// dividers, and macOS remembers each divider's position through its autosave name.
+/// The user decides what goes where by ⌘-dragging icons across the │ dividers, and
+/// macOS remembers each divider's position through its autosave name. How the
+/// hidden sections are actually hidden depends on the system — see `HidingMethod`.
 @MainActor
 final class SectionManager: ObservableObject {
     enum RevealState: Equatable {
@@ -37,31 +41,73 @@ final class SectionManager: ObservableObject {
         case all
     }
 
+    enum HidingMethod: Equatable {
+        /// macOS 14–26: a divider stretched to 10 000 pt shoves its neighbours off
+        /// the screen, the technique every menu bar manager has used since Hidden Bar.
+        case pushOffscreen
+        /// macOS 27: MenuBarAgent removes the hidden apps' icons and reflows the bar.
+        case native
+        /// macOS 27 fallback: hidden icons are painted over. See `CoverController`.
+        case cover
+
+        var title: String {
+            switch self {
+            case .pushOffscreen: return "Classic (icons pushed off screen)"
+            case .native: return "Native (icons removed, bar reflows)"
+            case .cover: return "Cover (icons painted over)"
+            }
+        }
+    }
+
     @Published private(set) var state: RevealState = .collapsed
-    @Published private(set) var items: [MenuBarItem] = []
+    @Published private(set) var items: [MenuBarItem] = [] {
+        didSet {
+            updateSectionCache()
+            reapplyIfSomethingSlippedThrough()
+        }
+    }
     /// Set by automation rules; holds the reveal open regardless of auto-rehide.
     @Published var pinnedByRule: RevealState?
     @Published private(set) var isAccessibilityTrusted = AXIsProcessTrusted()
+    /// Native hiding failed this session (message for Settings); Sleeve has fallen back.
+    @Published private(set) var nativeFailure: String?
 
     private let toggleItem: NSStatusItem
     private let dividerItem: NSStatusItem
     private let alwaysDividerItem: NSStatusItem
 
     private static let dividerLength: CGFloat = 12
-    /// The long-divider trick, where macOS still honours it.
-    private static var hideLength: CGFloat { usesCoverHiding ? dividerLength : 10_000 }
+    private static let pushLength: CGFloat = 10_000
 
-    /// macOS 27+: hidden icons are covered, not pushed away. See `CoverController`.
-    static let usesCoverHiding: Bool = {
+    /// macOS 27 moved status item layout into MenuBarAgent: the 10 000 pt divider no
+    /// longer pushes anything (measured: 20 pt) and synthesized ⌘-drags are ignored.
+    static let isModernMenuBar: Bool = {
         if #available(macOS 27, *) { return true }
         return false
     }()
+
+    var method: HidingMethod {
+        guard Self.isModernMenuBar else { return .pushOffscreen }
+        if settings.useNativeHiding, nativeFailure == nil, isAccessibilityTrusted, NativeVisibility.isAvailable {
+            return .native
+        }
+        return .cover
+    }
 
     private let settings = SleeveSettings.shared
     private let scanQueue = DispatchQueue(label: "com.spindle.sleeve.scan", qos: .userInitiated)
     private var rehideTimer: Timer?
     private var rescanTimer: Timer?
     private var cancellables = Set<AnyCancellable>()
+
+    // Native hiding state.
+    private let native = NativeVisibility()
+    private var restriction: NativeVisibility.Restriction?
+    /// Bumped whenever a pending native change must no longer win.
+    private var nativeGeneration = 0
+    /// Section of every icon, last read while that icon was actually in the bar.
+    /// Needed because an icon macOS has removed reports a stale position.
+    private var itemSections: [String: MenuBarSection] = [:]
 
     /// Fired after every reveal-state change, with the new state.
     var onStateChange: ((RevealState) -> Void)?
@@ -99,23 +145,44 @@ final class SectionManager: ObservableObject {
         settings.$toggleIcon.sink { [weak self] _ in
             DispatchQueue.main.async { self?.updateIcons() }
         }.store(in: &cancellables)
-
-        apply(.collapsed, animated: false)
+        // Changing how or what to hide re-applies the current state the new way.
+        Publishers.Merge3(settings.$useNativeHiding.dropFirst().map { _ in () },
+                          settings.$hideAllApps.dropFirst().map { _ in () },
+                          settings.$alwaysShownBundles.dropFirst().map { _ in () })
+            .sink { [weak self] _ in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.releaseRestriction()
+                self.apply(self.state, force: true)
+            }
+        }.store(in: &cancellables)
 
         // Positions move whenever apps launch, quit or resize their items.
         rescanTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.rescan() }
         }
         let center = NSWorkspace.shared.notificationCenter
-        for name in [NSWorkspace.didLaunchApplicationNotification, NSWorkspace.didTerminateApplicationNotification] {
-            center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
-                Task { @MainActor in
-                    try? await Task.sleep(for: .milliseconds(600))
-                    self?.rescan()
-                }
+        center.addObserver(forName: NSWorkspace.didLaunchApplicationNotification, object: nil, queue: .main) { [weak self] note in
+            let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(900))
+                self?.appLaunched(app?.bundleIdentifier)
             }
         }
+        center.addObserver(forName: NSWorkspace.didTerminateApplicationNotification, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(600))
+                self?.rescan()
+            }
+        }
+
         rescan()
+        // Collapse once the first scan has told us where everything is.
+        Task {
+            try? await Task.sleep(for: .milliseconds(400))
+            await rescanSoon()
+            apply(.collapsed, force: true)
+        }
     }
 
     /// First launch only: put the control items at the left end of the status area,
@@ -136,8 +203,16 @@ final class SectionManager: ObservableObject {
     var dividerFrame: CGRect? { dividerItem.button?.window?.frame }
     var alwaysDividerFrame: CGRect? { alwaysDividerItem.button?.window?.frame }
 
-    func section(of item: MenuBarItem) -> MenuBarSection {
-        if item.isOverflowed { return .visible }
+    /// Whether `item` is really in the bar right now, so its position can be trusted.
+    /// While a native restriction is active, removed apps' icons report stale frames.
+    func isLive(_ item: MenuBarItem) -> Bool {
+        guard let restriction else { return true }
+        if item.isNativeSystemItem { return true }
+        guard let bundle = item.bundleID else { return false }
+        return restriction.allowed.contains(bundle)
+    }
+
+    private func geometricSection(of item: MenuBarItem) -> MenuBarSection {
         guard let divider = dividerFrame, let always = alwaysDividerFrame else { return .visible }
         let x = item.frame.midX
         if x > divider.maxX - 1 { return .visible }
@@ -145,23 +220,114 @@ final class SectionManager: ObservableObject {
         return .alwaysHidden
     }
 
+    func section(of item: MenuBarItem) -> MenuBarSection {
+        if item.isOverflowed { return .visible }
+        if !isLive(item) { return itemSections[item.id] ?? .hidden }
+        return geometricSection(of: item)
+    }
+
     func items(in section: MenuBarSection) -> [MenuBarItem] {
         items.filter { self.section(of: $0) == section }
+    }
+
+    private func updateSectionCache() {
+        for item in items where isLive(item) && !item.isOverflowed {
+            itemSections[item.id] = geometricSection(of: item)
+        }
+    }
+
+    /// Per app, the most visible section any of its icons is in — native hiding can
+    /// only show or hide an app's icons together.
+    private func bundleSections() -> [String: MenuBarSection] {
+        var result: [String: MenuBarSection] = [:]
+        for item in items where !item.isNativeSystemItem && !item.isOverflowed {
+            guard let bundle = item.bundleID else { continue }
+            let section = self.section(of: item)
+            if let existing = result[bundle], existing.rank <= section.rank { continue }
+            result[bundle] = section
+        }
+        return result
+    }
+
+    /// Whether hide-all mode hides this icon while collapsed.
+    func isHiddenByHideAll(_ item: MenuBarItem) -> Bool {
+        guard !item.isOverflowed, !item.isNativeSystemItem else { return false }
+        guard let bundle = item.bundleID else { return true }
+        return !settings.alwaysShownBundles.contains(bundle)
+    }
+
+    private var lastReapply = Date.distantPast
+
+    /// Under a native restriction, an icon that should be hidden but is in the bar
+    /// (an app launched after the restriction, a bundleless icon, an icon dragged
+    /// into a hidden section) means the allow-list is out of date: refresh it.
+    private func reapplyIfSomethingSlippedThrough() {
+        guard method == .native, state != .all, Date.now.timeIntervalSince(lastReapply) > 2 else { return }
+        let slipped: Bool
+        if settings.hideAllApps {
+            slipped = state == .collapsed && items.contains { isLive($0) && isHiddenByHideAll($0) && !isOwn($0) }
+        } else {
+            let hiding: Set<MenuBarSection> = state == .collapsed ? [.hidden, .alwaysHidden] : [.alwaysHidden]
+            slipped = items.contains {
+                isLive($0) && !$0.isNativeSystemItem && !$0.isOverflowed && !isOwn($0)
+                    && hiding.contains(geometricSection(of: $0))
+            }
+        }
+        guard slipped else { return }
+        lastReapply = .now
+        applyNative(state)
+    }
+
+    private func isOwn(_ item: MenuBarItem) -> Bool {
+        item.pid == ProcessInfo.processInfo.processIdentifier
     }
 
     /// Left edge of the leftmost icon that is actually on screen — where the empty
     /// stretch of menu bar ends.
     var leftmostVisibleX: CGFloat? {
         let screenMinX = NSScreen.screens.first?.frame.minX ?? 0
-        var xs = items.map(\.frame.minX).filter { $0 >= screenMinX }
+        var xs = items.filter { isLive($0) && !$0.isOverflowed }.map(\.frame.minX).filter { $0 >= screenMinX }
         if let toggle = toggleFrame { xs.append(toggle.minX) }
         return xs.min()
+    }
+
+    /// Icons that are in a hidden section for the current state but that the active
+    /// method can't remove, so `CoverController` paints over them.
+    func itemsNeedingCover() -> [MenuBarItem] {
+        if settings.hideAllApps {
+            // Hide-all only covers in the fallback; natively, apps are removed and
+            // Apple's own items are meant to stay.
+            guard method == .cover, state == .collapsed else { return [] }
+            return items.filter { isHiddenByHideAll($0) }
+        }
+        let hiding: [MenuBarSection]
+        switch state {
+        case .collapsed: hiding = [.hidden, .alwaysHidden]
+        case .hidden: hiding = [.alwaysHidden]
+        case .all: hiding = []
+        }
+        let candidates = items.filter { !$0.isOverflowed && hiding.contains(section(of: $0)) }
+        switch method {
+        case .pushOffscreen: return []
+        case .cover: return candidates
+        // Native hiding keeps macOS's own items; only those still need covering.
+        case .native: return candidates.filter { $0.isNativeSystemItem && isLive($0) }
+        }
     }
 
     // MARK: - Scanning
 
     func rescan() {
-        isAccessibilityTrusted = AXIsProcessTrusted()
+        let trusted = AXIsProcessTrusted()
+        if trusted && !isAccessibilityTrusted {
+            // Just granted: hiding couldn't work until now, so apply it properly.
+            isAccessibilityTrusted = true
+            Task {
+                await rescanSoon(after: 100)
+                apply(state, force: true)
+            }
+        }
+        isAccessibilityTrusted = trusted
         scanQueue.async { [weak self] in
             let found = MenuBarScanner.scan()
             Task { @MainActor in
@@ -171,9 +337,10 @@ final class SectionManager: ObservableObject {
         }
     }
 
-    /// Waits for macOS to lay the bar out again after a length change, then rescans.
-    func rescanSoon() async {
-        try? await Task.sleep(for: .milliseconds(180))
+    /// Waits for macOS to lay the bar out again after a change, then rescans.
+    func rescanSoon(after delay: Int = 180) async {
+        try? await Task.sleep(for: .milliseconds(delay))
+        isAccessibilityTrusted = AXIsProcessTrusted()
         await withCheckedContinuation { continuation in
             scanQueue.async { [weak self] in
                 let found = MenuBarScanner.scan()
@@ -185,24 +352,37 @@ final class SectionManager: ObservableObject {
         }
     }
 
+    /// A new app's icon lands wherever macOS puts it; under a native restriction it
+    /// would be hidden just for being new. Treat unknown apps as Visible and re-apply.
+    private func appLaunched(_ bundleID: String?) {
+        rescan()
+        guard method == .native, let restriction, let bundleID, !restriction.allowed.contains(bundleID) else { return }
+        let known = items.contains { $0.bundleID == bundleID && itemSections[$0.id] != nil && itemSections[$0.id] != .visible }
+        guard !known else { return }
+        for item in items where item.bundleID == bundleID { itemSections[item.id] = .visible }
+        apply(state, force: true)
+    }
+
     // MARK: - Reveal
 
     func reveal(_ target: RevealState = .hidden) {
         guard target != .collapsed else { return collapse() }
-        apply(target, animated: true)
+        apply(target)
         scheduleRehide()
     }
 
     func collapse() {
         if let pinned = pinnedByRule {
             // A rule is holding things open; drop back to that rather than closing.
-            if state != pinned { apply(pinned, animated: true) }
+            if state != pinned { apply(pinned) }
             return
         }
-        apply(.collapsed, animated: true)
+        apply(.collapsed)
     }
 
     func toggle() {
+        // Hide-all has no Hidden-vs-Always-Hidden distinction: revealing shows everything.
+        if settings.hideAllApps { return toggleAll() }
         state == .collapsed ? reveal(.hidden) : collapse()
     }
 
@@ -210,32 +390,122 @@ final class SectionManager: ObservableObject {
         state == .all ? collapse() : reveal(.all)
     }
 
-    private func apply(_ new: RevealState, animated: Bool) {
-        switch new {
-        case .collapsed:
-            dividerItem.length = Self.hideLength
-            alwaysDividerItem.length = Self.hideLength
-        case .hidden:
-            dividerItem.length = Self.dividerLength
-            alwaysDividerItem.length = Self.hideLength
-        case .all:
+    private func apply(_ new: RevealState, force: Bool = false) {
+        let changed = state != new
+        guard changed || force else { return }
+
+        switch method {
+        case .pushOffscreen:
+            dividerItem.length = new == .collapsed ? Self.pushLength : Self.dividerLength
+            alwaysDividerItem.length = new == .all ? Self.dividerLength : Self.pushLength
+            releaseRestriction()
+        case .cover:
             dividerItem.length = Self.dividerLength
             alwaysDividerItem.length = Self.dividerLength
+            releaseRestriction()
+        case .native:
+            dividerItem.length = Self.dividerLength
+            alwaysDividerItem.length = Self.dividerLength
+            applyNative(new)
         }
-        let changed = state != new
+
         state = new
         updateIcons()
-        if changed {
-            onStateChange?(new)
-            Task { await rescanSoon() }
-        }
+        if changed { onStateChange?(new) }
+        Task { await rescanSoon() }
         if new == .collapsed { rehideTimer?.invalidate() }
+    }
+
+    // MARK: - Native hiding
+
+    private func applyNative(_ target: RevealState) {
+        nativeGeneration += 1
+        let generation = nativeGeneration
+        Task {
+            // Read the layout first, from whatever is live; removed icons keep the
+            // section they had when last seen.
+            await rescanSoon(after: 60)
+            guard generation == nativeGeneration else { return }
+
+            if settings.hideAllApps {
+                guard target == .collapsed else {
+                    releaseRestriction()
+                    return
+                }
+                var allowed = Set(settings.alwaysShownBundles)
+                if let own = Bundle.main.bundleIdentifier { allowed.insert(own) }
+                await restrictNatively(to: allowed, generation: generation,
+                                       describing: "every app except \(allowed.sorted())")
+                return
+            }
+
+            let hiding: Set<MenuBarSection>
+            switch target {
+            case .collapsed: hiding = [.hidden, .alwaysHidden]
+            case .hidden: hiding = [.alwaysHidden]
+            case .all: hiding = []
+            }
+            let sections = bundleSections()
+            let hiddenBundles = Set(sections.filter { hiding.contains($0.value) }.keys)
+            let hidesBundlelessItem = items.contains {
+                $0.bundleID == nil && !$0.isNativeSystemItem && hiding.contains(section(of: $0))
+            }
+            guard !hiddenBundles.isEmpty || hidesBundlelessItem else {
+                if restriction != nil { NSLog("Sleeve: native hiding released — nothing to hide") }
+                releaseRestriction()
+                return
+            }
+
+            var allowed = Set(sections.keys).subtracting(hiddenBundles)
+            if let own = Bundle.main.bundleIdentifier { allowed.insert(own) }
+            await restrictNatively(to: allowed, generation: generation,
+                                   describing: "\(hiddenBundles.sorted())\(hidesBundlelessItem ? " + icons without a bundle ID" : "")")
+        }
+    }
+
+    private func restrictNatively(to allowed: Set<String>, generation: Int, describing hidden: String) async {
+        let result = await native.restrict(to: allowed)
+        guard generation == nativeGeneration else {
+            // A newer change won the race; drop this one.
+            if case .success(let stale) = result { stale.release() }
+            return
+        }
+        switch result {
+        case .success(let new):
+            NSLog("Sleeve: native hiding active — hiding \(hidden)")
+            // New restriction first, then release the old, so nothing flashes.
+            let old = restriction
+            restriction = new
+            old?.release()
+            objectWillChange.send()
+        case .failure(let error):
+            // Fail open: never leave icons hidden after an error. Covering takes over.
+            NSLog("Sleeve: native hiding failed, falling back to covering: \(error.localizedDescription)")
+            releaseRestriction()
+            nativeFailure = error.localizedDescription
+            apply(state, force: true)
+        }
+    }
+
+    private func releaseRestriction() {
+        nativeGeneration += 1
+        restriction?.release()
+        if restriction != nil {
+            restriction = nil
+            objectWillChange.send()
+        }
+    }
+
+    /// Lets Settings retry after a failure (e.g. once Accessibility is granted).
+    func retryNativeHiding() {
+        nativeFailure = nil
+        apply(state, force: true)
     }
 
     func applyRulePin(_ pin: RevealState?) {
         pinnedByRule = pin
         if let pin {
-            if state == .collapsed || (pin == .all && state != .all) { apply(pin, animated: true) }
+            if state == .collapsed || (pin == .all && state != .all) { apply(pin) }
         } else if state != .collapsed {
             scheduleRehide()
         }
@@ -299,29 +569,37 @@ final class SectionManager: ObservableObject {
 
     // MARK: - Activating an item
 
-    /// Opens a status item's menu, even if it is currently hidden: the section is
-    /// revealed first so the menu appears in the right place, then the item is pressed.
-    /// With cover hiding the icon never left its place, so it's pressed where it is
-    /// and its menu drops down over the cover.
+    /// Opens a status item's menu, even if it is currently hidden.
     func activate(_ item: MenuBarItem) async {
-        if Self.usesCoverHiding {
-            let fresh = items.first { $0.id == item.id } ?? item
-            if !fresh.element.press() {
-                ItemMover.click(at: CGPoint(x: fresh.frame.midX, y: fresh.frame.midY))
-            }
-            return
-        }
         let section = self.section(of: item)
         let needed: RevealState = section == .alwaysHidden ? .all : (section == .hidden ? .hidden : state)
-        if needed != state && needed != .collapsed {
-            apply(needed, animated: true)
-            await rescanSoon()
+
+        switch method {
+        case .cover:
+            // The icon never left its place; press it there and its menu drops down
+            // over the cover.
+            break
+        case .pushOffscreen:
+            if needed != state && needed != .collapsed {
+                apply(needed)
+                await rescanSoon()
+            }
+        case .native:
+            if !isLive(item) {
+                reveal(needed == .collapsed ? .hidden : needed)
+                // Wait for macOS to put the icon back and reflow, then read where it is.
+                for _ in 0..<20 where !isLive(item) {
+                    try? await Task.sleep(for: .milliseconds(100))
+                }
+                await rescanSoon(after: 250)
+            }
         }
+
         let fresh = items.first { $0.id == item.id } ?? item
         if !fresh.element.press() {
             ItemMover.click(at: CGPoint(x: fresh.frame.midX, y: fresh.frame.midY))
         }
-        scheduleRehide()
+        if method != .cover { scheduleRehide() }
     }
 
     // MARK: - Toggle button
@@ -341,12 +619,12 @@ final class SectionManager: ObservableObject {
             return
         }
         // Nothing to show yet: explain how to hide something instead of doing nothing.
-        if state == .collapsed && isAccessibilityTrusted
+        if !settings.hideAllApps && state == .collapsed && isAccessibilityTrusted
             && items(in: .hidden).isEmpty && items(in: .alwaysHidden).isEmpty {
             showHowToHide()
             return
         }
-        if settings.useSleeveBar {
+        if settings.useSleeveBar && !settings.hideAllApps {
             onToggleClickedForBar?()
         } else {
             toggle()
@@ -383,12 +661,11 @@ final class SectionManager: ObservableObject {
         toggleItem.button?.image = image
 
         // Dividers show a faint tick so the user can see where to drop icons. With the
-        // classic method a collapsed divider is a long invisible spacer instead; with
-        // cover hiding the ticks stay (anything behind them is under the cover anyway).
+        // classic method a collapsed divider is a long invisible spacer instead.
         let tick = NSImage(systemSymbolName: "poweron", accessibilityDescription: nil)?
             .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 9, weight: .light))
         tick?.isTemplate = true
-        let alwaysShowTicks = Self.usesCoverHiding
+        let alwaysShowTicks = Self.isModernMenuBar
         dividerItem.button?.image = (alwaysShowTicks || state != .collapsed) ? tick : nil
         alwaysDividerItem.button?.image = (alwaysShowTicks || state == .all) ? tick : nil
         dividerItem.button?.alphaValue = 0.35
@@ -396,7 +673,8 @@ final class SectionManager: ObservableObject {
     }
 
     func tearDown() {
-        // Leave the bar as we found it: an expanded divider must not outlive the app.
+        // Leave the bar as we found it: no restriction, no stretched divider.
+        releaseRestriction()
         dividerItem.length = Self.dividerLength
         alwaysDividerItem.length = Self.dividerLength
         rehideTimer?.invalidate()

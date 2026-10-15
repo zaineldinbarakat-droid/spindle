@@ -52,6 +52,16 @@ final class SleeveSettings: ObservableObject {
     /// Show hidden items in a floating bar under the menu bar instead of in place.
     /// On notched Macs this is what keeps them from disappearing behind the camera.
     @Published var useSleeveBar: Bool { didSet { save(useSleeveBar, "useSleeveBar") } }
+    /// macOS 27: hide icons with macOS's own (private) restriction so they leave the
+    /// bar, instead of painting over them. Falls back to covering if unavailable.
+    @Published var useNativeHiding: Bool { didSet { save(useNativeHiding, "useNativeHiding") } }
+
+    /// Ice-style: every app icon is hidden until the cursor reaches the menu bar.
+    /// Apple's own items and `alwaysShownBundles` stay. When off, only icons the user
+    /// ⌘-dragged into the Hidden sections are hidden.
+    @Published var hideAllApps: Bool { didSet { save(hideAllApps, "hideAllApps") } }
+    /// Apps kept visible even with `hideAllApps` on.
+    @Published var alwaysShownBundles: [String] { didSet { save(alwaysShownBundles, "alwaysShownBundles") } }
 
     // MARK: Spindle
 
@@ -88,7 +98,7 @@ final class SleeveSettings: ObservableObject {
             d.object(forKey: key) == nil ? fallback : d.bool(forKey: key)
         }
         toggleIcon = ToggleIcon(rawValue: d.string(forKey: "toggleIcon") ?? "") ?? .chevron
-        revealOnHover = bool("revealOnHover", false)
+        revealOnHover = bool("revealOnHover", true)
         revealOnScroll = bool("revealOnScroll", true)
         revealOnEmptyClick = bool("revealOnEmptyClick", false)
         rehideMode = RehideMode(rawValue: d.string(forKey: "rehideMode") ?? "") ?? .smart
@@ -97,7 +107,17 @@ final class SleeveSettings: ObservableObject {
         // camera — except on macOS 27, where hidden icons never move (they're covered,
         // not pushed), so revealing them in place is always safe.
         let hasNotch = NSScreen.screens.contains { $0.safeAreaInsets.top > 0 }
-        useSleeveBar = bool("useSleeveBar", hasNotch && !SectionManager.usesCoverHiding)
+        useSleeveBar = bool("useSleeveBar", hasNotch && !SectionManager.isModernMenuBar)
+        useNativeHiding = bool("useNativeHiding", true)
+        // First launch of the version that introduced hide-all: it only makes sense
+        // with hover-to-reveal, so switch that on once, whatever was saved before.
+        if d.object(forKey: "hideAllApps") == nil {
+            d.set(true, forKey: "hideAllApps")
+            d.set(true, forKey: "revealOnHover")
+            revealOnHover = true
+        }
+        hideAllApps = bool("hideAllApps", true)
+        alwaysShownBundles = d.stringArray(forKey: "alwaysShownBundles") ?? []
         avoidSpindle = bool("avoidSpindle", true)
         zenHidesSpindle = bool("zenHidesSpindle", true)
 

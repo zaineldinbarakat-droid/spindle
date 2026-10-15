@@ -203,6 +203,11 @@ final class NotchWindowController {
         }
     }
 
+    /// When the panel last opened and closed — the hysteresis that keeps a cursor
+    /// sitting on the boundary from flickering it open and shut.
+    private var openedAt = Date.distantPast
+    private var closedAt = Date.distantPast
+
     private func handleMouseMoved() {
         guard viewModel.openOnHover, !viewModel.isZenHidden else { return }
         let location = NSEvent.mouseLocation
@@ -216,24 +221,32 @@ final class NotchWindowController {
                 closeWorkItem = nil
             }
         } else if metrics.hoverZone().contains(location) {
+            // Just closed: don't bounce straight back open while the cursor is
+            // crossing the edge on its way out.
+            guard Date.now.timeIntervalSince(closedAt) > 0.18 else { return }
             closeWorkItem?.cancel()
             closeWorkItem = nil
             panel?.ignoresMouseEvents = false
+            openedAt = .now
             viewModel.expand()
         }
     }
 
     private func scheduleClose() {
         guard closeWorkItem == nil else { return }
+        // Never close in the first moments after opening: the panel is still growing
+        // under the cursor, and a quick graze shouldn't snap it shut mid-animation.
+        let minimumOpen = max(0.35 - Date.now.timeIntervalSince(openedAt), 0)
         let item = DispatchWorkItem { [weak self] in
             guard let self else { return }
             self.closeWorkItem = nil
             // Re-check: the cursor may have come back while we waited.
             guard !self.viewModel.metrics.liveZone().contains(NSEvent.mouseLocation) else { return }
+            self.closedAt = .now
             self.viewModel.collapse()
         }
         closeWorkItem = item
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.22, execute: item)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25 + minimumOpen, execute: item)
     }
 
     // MARK: - Teardown

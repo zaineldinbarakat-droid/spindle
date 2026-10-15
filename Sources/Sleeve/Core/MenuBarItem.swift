@@ -35,6 +35,14 @@ struct MenuBarItem: Identifiable, Equatable {
         return ownerName
     }
 
+    /// Owned by macOS itself (clock, Wi-Fi, Control Center…). Native hiding always
+    /// keeps these, so Sleeve covers them instead when they're in a hidden section.
+    var isNativeSystemItem: Bool {
+        guard let bundleID else { return false }
+        return ["com.apple.MenuBarAgent", "com.apple.controlcenter", "com.apple.systemuiserver",
+                "com.apple.TextInputMenuAgent", "com.apple.Siri"].contains(bundleID)
+    }
+
     var isSystemItem: Bool {
         ["MenuBarAgent", "ControlCenter", "Control Centre", "SystemUIServer", "TextInputMenuAgent"]
             .contains(ownerName)

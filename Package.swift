@@ -17,9 +17,15 @@ let package = Package(
             path: "Sources/Spindle",
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),
+        // macOS 27's menu bar visibility restriction (private framework, resolved
+        // at runtime). Objective-C so a changed API raises a catchable exception.
+        .target(
+            name: "MenuBarVisibility",
+            path: "Sources/MenuBarVisibility"
+        ),
         .executableTarget(
             name: "Sleeve",
-            dependencies: ["SpindleSync"],
+            dependencies: ["SpindleSync", "MenuBarVisibility"],
             path: "Sources/Sleeve",
             swiftSettings: [.swiftLanguageMode(.v5)],
             linkerSettings: [.linkedFramework("Carbon"), .linkedFramework("IOKit")]
