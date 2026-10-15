@@ -1,4 +1,5 @@
 import SwiftUI
+import SpindleSync
 
 struct SettingsView: View {
     @EnvironmentObject private var player: PlayerManager
@@ -118,6 +119,10 @@ struct SettingsView: View {
                 Text("Drag a widget by its wooden edge to move it; right-click to remove it.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+            }
+
+            Section("Updates") {
+                UpdatesRow(updater: AppEnvironment.shared.updater)
             }
 
             Section {

@@ -57,9 +57,12 @@ of the screen.
   Apple's own icons. Hover over Sleeve's icon (or the right side of the bar) and every
   app icon comes back; move away and they tuck away again. Pick apps to always keep
   visible under *Settings → Layout*.
-- **Instant.** Revealing on hover and hiding when the cursor leaves the menu bar have no
-  delay (measured on macOS 27: ~100 ms to show and ~70 ms to hide, including macOS
-  redrawing the bar). An open menu holds things in place.
+- **Instant and steady.** Revealing on hover and hiding when the cursor leaves the menu
+  bar have no delay (measured on macOS 27: ~100 ms to show, ~70 ms to hide, including
+  macOS redrawing the bar), with a little spatial slack so resting on the bar's edge
+  never flickers. An open menu holds things in place.
+- **No icon, if you like.** Turn Sleeve's icon off and the menu bar itself is the
+  interface: hover to show, move away to hide. Open Sleeve again to get to Settings.
 - **Two-finger click** on Sleeve's icon or an empty part of the bar shows or hides the
   hidden apps (⌃-click the icon for Sleeve's menu).
 - **An icon with two faces,** like Ice's image sets: an outlined eye while your apps are
@@ -131,8 +134,27 @@ Access** (there is no public Focus API). Each is asked for only when a feature n
 
 ## App icons
 
-Both icons are drawn in code by `Packaging/make-icons.swift` (run it with `swift` to
-regenerate `Spindle.icns` and `Sleeve.icns`); `build.sh` bundles them.
+Each icon is a 3D emoji from Microsoft's [Fluent Emoji](https://github.com/microsoft/fluentui-emoji)
+(MIT; licence in `Packaging/emoji/`) — 💿 for Spindle, 👀 for Sleeve — on a macOS tile,
+composed by `Packaging/make-icons.swift` (run it with `swift` to regenerate the `.icns`
+files); `build.sh` bundles them.
+
+## Updates
+
+Both apps check this repository for updates once a day (and on demand from their menu
+or Settings → Updates). `updates/latest.json` holds the newest version and its notes;
+`updates/Spindle.zip` and `updates/Sleeve.zip` hold the builds. When there's a newer
+version the app shows what changed and offers **Install & Relaunch**: it downloads its
+zip, checks the bundle identifier and code signature, sets the old copy aside, puts the
+new one in its place and reopens. Permissions carry over (see below).
+
+To publish a fix — say, for a new macOS release:
+
+```bash
+./release.sh 0.3.1 "Works with macOS 28"
+```
+
+then commit and push. `VERSION` is the single version number both apps are built with.
 
 ## Requirements
 

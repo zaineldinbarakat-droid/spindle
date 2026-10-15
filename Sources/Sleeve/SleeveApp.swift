@@ -1,6 +1,7 @@
 import AppKit
 import Combine
 import SwiftUI
+import SpindleSync
 
 /// Sleeve: a menu bar manager that keeps Spindle company.
 @main
@@ -29,6 +30,7 @@ final class SleeveEnvironment: ObservableObject {
     lazy var overlay = MenuBarOverlayController(sections: sections, spindle: spindle)
     lazy var gestures = RevealGestures(sections: sections, spindle: spindle)
     lazy var cover = CoverController(sections: sections)
+    let updater = Updater(appName: "Sleeve")
 
     @Published var settingsTab: SettingsTab = .general
 
@@ -80,6 +82,7 @@ final class SleeveAppDelegate: NSObject, NSApplicationDelegate {
             if !AXIsProcessTrusted() {
                 SleeveSettingsWindow.show()
             }
+            env.updater.checkInBackgroundIfDue()
         }
     }
 
@@ -118,8 +121,26 @@ final class SleeveAppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(.separator())
         let zen = add("Zen Mode") { env.zen.toggle() }
         zen.state = env.zen.isOn ? .on : .off
+
+        let colorItem = NSMenuItem(title: "Menu Bar Color", action: nil, keyEquivalent: "")
+        let colorMenu = NSMenu()
+        for (name, style) in MenuBarStyle.presets {
+            let entry = ClosureMenuItem(title: name, keyEquivalent: "") {
+                env.settings.appearance.light = style
+                if env.settings.appearance.separateDarkStyle { env.settings.appearance.dark = style }
+            }
+            entry.state = env.settings.appearance.light == style ? .on : .off
+            colorMenu.addItem(entry)
+        }
+        colorMenu.addItem(.separator())
+        colorMenu.addItem(ClosureMenuItem(title: "Customize…", keyEquivalent: "") {
+            SleeveSettingsWindow.show(tab: .appearance)
+        })
+        colorItem.submenu = colorMenu
+        menu.addItem(colorItem)
         menu.addItem(.separator())
         _ = add("Settings…", ",") { SleeveSettingsWindow.show() }
+        _ = add("Check for Updates…") { env.updater.checkNow() }
         menu.addItem(.separator())
         menu.addItem(withTitle: "Quit Sleeve", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         return menu

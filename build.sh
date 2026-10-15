@@ -42,6 +42,9 @@ assemble() {
     mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
     cp "$bin" "$app/Contents/MacOS/$name"
     cp "$plist" "$app/Contents/Info.plist"
+    # One version for both apps, from VERSION; the build number counts commits.
+    /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $(cat "$ROOT/VERSION")" "$app/Contents/Info.plist"
+    /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $(git -C "$ROOT" rev-list --count HEAD 2>/dev/null || echo 1)" "$app/Contents/Info.plist"
     printf 'APPL????' > "$app/Contents/PkgInfo"
 
     if [[ -f "$ROOT/Packaging/$name.icns" ]]; then

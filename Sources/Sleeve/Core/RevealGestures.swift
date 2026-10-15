@@ -11,7 +11,6 @@ final class RevealGestures {
     private unowned let spindle: SpindleBridge
     private let settings = SleeveSettings.shared
     private var monitors: [Any] = []
-    private var hoverWork: DispatchWorkItem?
     private var appMenusEnd: CGFloat = 0
     private var lastScrollToggle = Date.distantPast
 
@@ -53,7 +52,9 @@ final class RevealGestures {
     }
 
     private func isOverEmptyBar(_ point: CGPoint) -> Bool {
-        guard let screen = NSScreen.screens.first, MenuBarGeometry.strip(of: screen).contains(point) else {
+        guard let screen = NSScreen.screens.first,
+              point.x >= screen.frame.minX, point.x <= screen.frame.maxX,
+              MenuBarGeometry.isInMenuBar(point) else {
             return false
         }
         if spindle.owns(point) { return false }
@@ -70,8 +71,7 @@ final class RevealGestures {
     }
 
     private func isInBar(_ point: CGPoint) -> Bool {
-        guard let screen = NSScreen.screens.first(where: { $0.frame.contains(point) }) else { return false }
-        return MenuBarGeometry.strip(of: screen).contains(point) && !spindle.owns(point)
+        MenuBarGeometry.isInMenuBar(point) && !spindle.owns(point)
     }
 
     private func reveal() {
@@ -85,13 +85,14 @@ final class RevealGestures {
     }
 
     private func mouseMoved() {
-        guard settings.revealOnHover else { return }
         let point = NSEvent.mouseLocation
-        guard sections.state == .collapsed, isOverEmptyBar(point) else {
-            hoverWork?.cancel()
-            hoverWork = nil
+        // Leaving the bar re-arms hover (see SectionManager.isHoverArmed).
+        if !MenuBarGeometry.isInMenuBar(point, margin: 6) {
+            sections.isHoverArmed = true
             return
         }
+        guard settings.revealOnHover, sections.isHoverArmed,
+              sections.state == .collapsed, isOverEmptyBar(point) else { return }
         // No dwell: reaching the bar is enough.
         reveal()
     }

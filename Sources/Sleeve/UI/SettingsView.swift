@@ -1,6 +1,7 @@
 import AppKit
 import ServiceManagement
 import SwiftUI
+import SpindleSync
 
 @MainActor
 enum SleeveSettingsWindow {
@@ -111,10 +112,20 @@ private struct PermissionBanner: View {
 private struct GeneralTab: View {
     @EnvironmentObject private var settings: SleeveSettings
     @EnvironmentObject private var sections: SectionManager
+    @EnvironmentObject private var env: SleeveEnvironment
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
 
     var body: some View {
         Form {
+            Section("Menu bar color") {
+                MenuBarColorPresets()
+                HStack {
+                    Text("Gradients with any number of colours, shapes, shadows and borders.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Customize…") { env.settingsTab = .appearance }
+                }
+            }
             Section("What to hide") {
                 Toggle("Hide all app icons until I hover over the menu bar", isOn: $settings.hideAllApps)
                 Text(settings.hideAllApps
@@ -123,6 +134,19 @@ private struct GeneralTab: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("Sleeve's icon") {
+                Toggle("Show Sleeve's icon in the menu bar", isOn: Binding(
+                    get: { settings.showIcon },
+                    set: { show in
+                        settings.showIcon = show
+                        // Without the icon, hovering the bar is the only way in.
+                        if !show { settings.revealOnHover = true }
+                    }))
+                if !settings.showIcon {
+                    Text("Just hover over the menu bar to show your apps and move away to hide them. To get back here, open Sleeve again from Spotlight or Finder.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            Section("Icon style") {
                 IconStylePicker()
                 Toggle("Reveal when hovering over Sleeve's icon", isOn: $settings.revealOnIconHover)
                 Toggle("Two-finger click shows or hides hidden apps", isOn: $settings.revealOnTwoFingerClick)
@@ -166,6 +190,9 @@ private struct GeneralTab: View {
                     }
                 }
             }
+            Section("Updates") {
+                UpdatesRow(updater: env.updater)
+            }
             Section {
                 Toggle("Launch at login", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, on in
@@ -178,6 +205,41 @@ private struct GeneralTab: View {
             }
         }
         .formStyle(.grouped)
+    }
+}
+
+/// One-click menu bar looks, each drawn as a little swatch of the real thing.
+private struct MenuBarColorPresets: View {
+    @EnvironmentObject private var settings: SleeveSettings
+
+    var body: some View {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 8) {
+            ForEach(MenuBarStyle.presets, id: \.0) { name, style in
+                let selected = settings.appearance.light == style
+                Button {
+                    settings.appearance.light = style
+                    if settings.appearance.separateDarkStyle { settings.appearance.dark = style }
+                } label: {
+                    VStack(spacing: 4) {
+                        MenuBarStyleView(style: style, layout: BarLayout(
+                            size: CGSize(width: 96, height: 18), barHeight: 18,
+                            appMenusEnd: 30, statusStart: 62, notch: nil))
+                            .frame(width: 96, height: 18)
+                            .background(LinearGradient(colors: [.blue.opacity(0.35), .purple.opacity(0.3)],
+                                                       startPoint: .leading, endPoint: .trailing))
+                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                        Text(name).font(.caption)
+                    }
+                    .padding(6)
+                    .frame(maxWidth: .infinity)
+                    .background(RoundedRectangle(cornerRadius: 8)
+                        .fill(selected ? Color.accentColor.opacity(0.18) : Color.primary.opacity(0.04)))
+                    .overlay(RoundedRectangle(cornerRadius: 8)
+                        .strokeBorder(selected ? Color.accentColor : .clear, lineWidth: 1.5))
+                }
+                .buttonStyle(.plain)
+            }
+        }
     }
 }
 

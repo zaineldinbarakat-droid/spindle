@@ -27,35 +27,41 @@ struct NotchBackground: View {
             shape
                 .fill(Theme.panel)
                 .overlay(
-                    // Cover art bleeding a faint glow into the panel.
+                    // Cover art glowing faintly into the panel, below the notch strip.
                     shape.fill(
                         RadialGradient(colors: [player.accent.opacity(isExpanded ? 0.18 : 0), .clear],
                                        center: .init(x: 0.2, y: 0.6),
                                        startRadius: 10,
                                        endRadius: 280)
                     )
+                    .mask(belowNotchMask)
                 )
 
         case .songColor:
-            // Deep enough that white text stays legible on any cover, saturated enough
-            // that it's unmistakably the song's colour. Expanded, the top edge stays
-            // darker so the panel still melts into the black hardware notch. Collapsed,
-            // the pill is only as tall as the menu bar, so it takes the colour evenly —
-            // otherwise the tint is too thin to notice.
-            shape.fill(
-                LinearGradient(colors: isExpanded
-                                ? [player.accent.darkened(0.74), player.accent.darkened(0.48), player.accent.darkened(0.58)]
-                                : [player.accent.darkened(0.5), player.accent.darkened(0.42)],
-                               startPoint: .top, endPoint: .bottom)
-            )
-            .overlay(
+            // The colour never touches the notch: the collapsed pill and the strip
+            // beside the camera stay pure black like the hardware, and the cover's
+            // colour rises in from below that strip.
+            if isExpanded {
                 shape.fill(
-                    RadialGradient(colors: [player.accent.opacity(isExpanded ? 0.32 : 0.18), .clear],
-                                   center: .init(x: 0.2, y: 0.65),
-                                   startRadius: 4,
-                                   endRadius: 300)
+                    LinearGradient(stops: [
+                        .init(color: .black, location: 0),
+                        .init(color: .black, location: notchFraction),
+                        .init(color: player.accent.darkened(0.6), location: min(notchFraction + 0.32, 1)),
+                        .init(color: player.accent.darkened(0.52), location: 1)
+                    ], startPoint: .top, endPoint: .bottom)
                 )
-            )
+                .overlay(
+                    shape.fill(
+                        RadialGradient(colors: [player.accent.opacity(0.3), .clear],
+                                       center: .init(x: 0.2, y: 0.7),
+                                       startRadius: 4,
+                                       endRadius: 280)
+                    )
+                    .mask(belowNotchMask)
+                )
+            } else {
+                shape.fill(Theme.panel)
+            }
 
         case .liquidGlass:
             if #available(macOS 26, *) {
@@ -68,6 +74,22 @@ struct NotchBackground: View {
                 shape.fill(Theme.panel)
             }
         }
+    }
+}
+
+extension NotchBackground {
+    /// How far down the panel the notch strip reaches, as a fraction of its height.
+    var notchFraction: CGFloat {
+        min(viewModel.metrics.notchHeight / Theme.expandedHeight, 0.5)
+    }
+
+    /// Transparent across the notch strip, opaque below it, with a short fade.
+    var belowNotchMask: some View {
+        LinearGradient(stops: [
+            .init(color: .clear, location: 0),
+            .init(color: .clear, location: notchFraction),
+            .init(color: .black, location: min(notchFraction + 0.2, 1))
+        ], startPoint: .top, endPoint: .bottom)
     }
 }
 

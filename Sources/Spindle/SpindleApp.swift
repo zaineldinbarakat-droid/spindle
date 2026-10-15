@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import UserNotifications
+import SpindleSync
 
 /// Manual AppKit entry point.
 ///
@@ -45,6 +46,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
             UNUserNotificationCenter.current().delegate = self
 
             installStatusItem()
+            environment.updater.checkInBackgroundIfDue()
         }
     }
 
@@ -168,6 +170,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         menu.addItem(.separator())
 
         add(to: menu, "Settings…", #selector(openSettings), key: ",")
+        add(to: menu, "Check for Updates…", #selector(checkForUpdates))
         add(to: menu, "Grant Music Permissions…", #selector(openAutomationSettings))
 
         menu.addItem(.separator())
@@ -234,6 +237,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
 
     @MainActor @objc private func toggleFullScreen() {
         AppEnvironment.shared.desktop.toggleFullScreen()
+    }
+
+    @MainActor @objc private func checkForUpdates() {
+        AppEnvironment.shared.updater.checkNow()
     }
 
     @MainActor @objc private func openSettings() {

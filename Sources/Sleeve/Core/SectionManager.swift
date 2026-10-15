@@ -150,6 +150,9 @@ final class SectionManager: ObservableObject {
         settings.$toggleIcon.combineLatest(settings.$customIconData).sink { [weak self] _, _ in
             DispatchQueue.main.async { self?.updateIcons() }
         }.store(in: &cancellables)
+        settings.$showIcon.sink { [weak self] show in
+            DispatchQueue.main.async { self?.toggleItem.isVisible = show }
+        }.store(in: &cancellables)
         iconHover.onEnter = { [weak self] in self?.iconHoverBegan() }
         iconHover.onExit = { [weak self] in self?.iconHoverEnded() }
         // Changing how or what to hide re-applies the current state the new way.
@@ -423,6 +426,9 @@ final class SectionManager: ObservableObject {
         if new == .collapsed {
             rehideTimer?.invalidate()
             stopWatchingCursor()
+            if MenuBarGeometry.isInMenuBar(NSEvent.mouseLocation, margin: 6) { isHoverArmed = false }
+        } else if changed {
+            revealedAt = .now
         }
     }
 
@@ -445,7 +451,7 @@ final class SectionManager: ObservableObject {
                     releaseRestriction()
                     return
                 }
-                var allowed = Set(settings.alwaysShownBundles)
+                var allowed = Set(settings.alwaysShownBundles).union(appleAgentBundles())
                 if let own = Bundle.main.bundleIdentifier { allowed.insert(own) }
                 await restrictNatively(to: allowed, generation: generation,
                                        describing: "every app except \(allowed.sorted())")
@@ -479,7 +485,7 @@ final class SectionManager: ObservableObject {
                 return
             }
 
-            var allowed = Set(sections.keys).subtracting(hiddenBundles)
+            var allowed = Set(sections.keys).subtracting(hiddenBundles).union(appleAgentBundles())
             if let own = Bundle.main.bundleIdentifier { allowed.insert(own) }
             await restrictNatively(to: allowed, generation: generation,
                                    describing: "\(hiddenBundles.sorted())\(hidesBundlelessItem ? " + icons without a bundle ID" : "")")
@@ -569,6 +575,8 @@ final class SectionManager: ObservableObject {
         let handler: () -> Void = { [weak self] in
             guard let self, self.state != .collapsed else { return }
             if self.isCursorInMenuBarOrBar() { return }
+            // The bar is still rearranging itself for a moment after a reveal.
+            if Date.now.timeIntervalSince(self.revealedAt) < 0.15 { return }
             // Asking the window server whether a menu is open costs a little, so do
             // it at most every 80 ms while the cursor roams outside the bar.
             if Date.now.timeIntervalSince(self.lastMenuCheck) > 0.08 {
@@ -607,9 +615,28 @@ final class SectionManager: ObservableObject {
     private func isCursorInMenuBarOrBar() -> Bool {
         let mouse = NSEvent.mouseLocation
         if let keepAliveRect, keepAliveRect.insetBy(dx: -8, dy: -8).contains(mouse) { return true }
-        guard let screen = NSScreen.screens.first(where: { $0.frame.contains(mouse) }) else { return false }
-        return mouse.y >= screen.frame.maxY - MenuBarGeometry.height(of: screen) - 4
+        // 6 pt of slack below the bar: resting on its bottom edge mustn't flap.
+        return MenuBarGeometry.isInMenuBar(mouse, margin: 6)
     }
+
+    /// Apple's own menu bar processes. They're always allow-listed: the restriction
+    /// only keeps "system items" by number, and anything else Apple puts in the bar —
+    /// Siri, owned by SystemUIServer — would otherwise vanish and reappear on every
+    /// toggle, shuffling the whole bar.
+    private func appleAgentBundles() -> Set<String> {
+        var bundles: Set<String> = ["com.apple.MenuBarAgent", "com.apple.controlcenter", "com.apple.systemuiserver",
+                                    "com.apple.TextInputMenuAgent", "com.apple.Siri"]
+        for item in items where item.isNativeSystemItem {
+            if let bundle = item.bundleID { bundles.insert(bundle) }
+        }
+        return bundles
+    }
+
+    /// Hover may reveal only after the cursor has been away from the bar since the
+    /// last hide — otherwise hiding with a click, or a hide while the cursor sits in
+    /// the bar, would be undone by the very next twitch of the mouse.
+    var isHoverArmed = true
+    private var revealedAt = Date.distantPast
 
     /// A status item's menu is open (pop-up menus live at their own window level).
     /// Collapsing then would yank the item out from under its own menu.
@@ -818,6 +845,17 @@ enum MenuBarGeometry {
     static func strip(of screen: NSScreen) -> CGRect {
         let h = height(of: screen)
         return CGRect(x: screen.frame.minX, y: screen.frame.maxY - h, width: screen.frame.width, height: h)
+    }
+
+    /// Whether `point` is on a menu bar, `margin` points of slack below it included.
+    /// Inclusive of the very top: pushed against the top edge the cursor reports
+    /// y == screen.frame.maxY exactly, which `CGRect.contains` calls outside.
+    static func isInMenuBar(_ point: CGPoint, margin: CGFloat = 0) -> Bool {
+        NSScreen.screens.contains { screen in
+            let frame = screen.frame
+            guard point.x >= frame.minX, point.x <= frame.maxX else { return false }
+            return point.y >= frame.maxY - height(of: screen) - margin && point.y <= frame.maxY + 2
+        }
     }
 }
 
