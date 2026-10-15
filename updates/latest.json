@@ -1,0 +1,5 @@
+{
+  "version": "0.3.0",
+  "notes": "Smoother hover in and out with no flicker (Siri stays put), two-finger click to show or hide, option to hide Sleeve's icon, menu bar color presets up front, album colour kept out of the notch, update checking, new app icons.",
+  "minimumSystemVersion": "14.0"
+}

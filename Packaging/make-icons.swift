@@ -2,9 +2,9 @@
 //
 //   swift Packaging/make-icons.swift
 //
-// Drawn rather than borrowed: Apple's emoji artwork can't be used as an app icon, and
-// open emoji sets need attribution. These follow the macOS icon grid — an 824 pt
-// continuous-corner tile on a 1024 pt canvas — in a soft, emoji-like style.
+// Each icon is a 3D emoji from Microsoft's Fluent Emoji (MIT, see Packaging/emoji/) on a
+// macOS tile — an 824 pt continuous-corner squircle on a 1024 pt canvas. Apple's own
+// emoji artwork can't be used in an app icon; Fluent's can.
 import AppKit
 import SwiftUI
 
@@ -34,116 +34,36 @@ struct Tile<Content: View>: View {
     }
 }
 
-struct Record: View {
+// MARK: - Emoji icons
+
+struct Emoji: View {
+    var file: String
     var size: CGFloat
-    var label: [Color]
 
     var body: some View {
-        ZStack {
-            Circle().fill(RadialGradient(colors: [Color(white: 0.18), Color(white: 0.04)],
-                                         center: .center, startRadius: size * 0.1, endRadius: size * 0.5))
-            // Grooves.
-            ForEach(0..<9) { i in
-                Circle()
-                    .stroke(Color.white.opacity(i % 2 == 0 ? 0.07 : 0.035), lineWidth: size * 0.006)
-                    .frame(width: size * (0.92 - CGFloat(i) * 0.055), height: size * (0.92 - CGFloat(i) * 0.055))
-            }
-            // Two-lobed sheen, the look of a glossy record under a lamp.
-            Circle().fill(AngularGradient(gradient: Gradient(stops: [
-                .init(color: .white.opacity(0), location: 0),
-                .init(color: .white.opacity(0.22), location: 0.12),
-                .init(color: .white.opacity(0), location: 0.25),
-                .init(color: .white.opacity(0), location: 0.5),
-                .init(color: .white.opacity(0.16), location: 0.62),
-                .init(color: .white.opacity(0), location: 0.75),
-                .init(color: .white.opacity(0), location: 1)
-            ]), center: .center))
-            Circle().fill(LinearGradient(colors: label, startPoint: .topLeading, endPoint: .bottomTrailing))
-                .frame(width: size * 0.36, height: size * 0.36)
-                .overlay(Circle().stroke(Color.black.opacity(0.25), lineWidth: size * 0.008))
-            Circle().fill(Color(white: 0.1)).frame(width: size * 0.045, height: size * 0.045)
+        if let image = NSImage(contentsOf: packaging.appendingPathComponent("emoji/\(file)")) {
+            Image(nsImage: image)
+                .resizable()
+                .interpolation(.high)
+                .aspectRatio(contentMode: .fit)
+                .frame(width: size, height: size)
+                .shadow(color: .black.opacity(0.28), radius: 24, y: 16)
         }
-        .frame(width: size, height: size)
-        .shadow(color: .black.opacity(0.45), radius: size * 0.04, y: size * 0.02)
     }
 }
-
-// MARK: - Spindle: a record on a walnut tile, tonearm resting on it
 
 struct SpindleIcon: View {
     var body: some View {
         Tile(colors: [Color(red: 0.45, green: 0.28, blue: 0.16), Color(red: 0.20, green: 0.11, blue: 0.06)]) {
-            ZStack {
-                Record(size: 600, label: [Color(red: 1.0, green: 0.62, blue: 0.28),
-                                          Color(red: 0.93, green: 0.30, blue: 0.38)])
-                    .offset(x: -40, y: 30)
-                Tonearm().offset(x: 185, y: -120)
-            }
+            Emoji(file: "optical_disk_3d.png", size: 560)
         }
-    }
-}
-
-struct Tonearm: View {
-    var body: some View {
-        ZStack(alignment: .topTrailing) {
-            // Arm: from the pivot, angled down-left onto the record.
-            Capsule()
-                .fill(LinearGradient(colors: [Color(white: 0.95), Color(white: 0.62)],
-                                     startPoint: .top, endPoint: .bottom))
-                .frame(width: 26, height: 420)
-                .rotationEffect(.degrees(24), anchor: .top)
-                .offset(x: -40, y: 40)
-            // Headshell.
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(Color(white: 0.22))
-                .frame(width: 58, height: 80)
-                .rotationEffect(.degrees(24))
-                .offset(x: -205, y: 410)
-            // Pivot.
-            Circle()
-                .fill(RadialGradient(colors: [Color(white: 0.95), Color(white: 0.55)],
-                                     center: .topLeading, startRadius: 0, endRadius: 90))
-                .frame(width: 110, height: 110)
-                .overlay(Circle().fill(Color(white: 0.35)).frame(width: 34, height: 34))
-        }
-        .frame(width: 300, height: 520, alignment: .topTrailing)
-        .shadow(color: .black.opacity(0.4), radius: 12, y: 8)
-    }
-}
-
-// MARK: - Sleeve: an eye, its iris a little record — "looking at your apps"
-
-/// The almond of an eye, drawn as two arcs (SF Symbols aren't licensed for app icons).
-struct EyeShape: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        let left = CGPoint(x: rect.minX, y: rect.midY)
-        let right = CGPoint(x: rect.maxX, y: rect.midY)
-        path.move(to: left)
-        path.addQuadCurve(to: right, control: CGPoint(x: rect.midX, y: rect.minY - rect.height * 0.5))
-        path.addQuadCurve(to: left, control: CGPoint(x: rect.midX, y: rect.maxY + rect.height * 0.5))
-        path.closeSubpath()
-        return path
     }
 }
 
 struct SleeveIcon: View {
     var body: some View {
-        Tile(colors: [Color(red: 0.55, green: 0.80, blue: 1.00), Color(red: 0.36, green: 0.42, blue: 0.95)]) {
-            ZStack {
-                EyeShape()
-                    .fill(Color.white)
-                    .frame(width: 600, height: 330)
-                    .shadow(color: Color(red: 0.15, green: 0.2, blue: 0.5).opacity(0.35), radius: 26, y: 16)
-                Record(size: 270, label: [Color(red: 1.0, green: 0.60, blue: 0.40),
-                                          Color(red: 0.95, green: 0.35, blue: 0.55)])
-                    .mask(EyeShape().frame(width: 600, height: 330))
-                // Catch-light: the spark that makes an emoji eye feel alive.
-                Circle().fill(Color.white.opacity(0.9))
-                    .frame(width: 46, height: 46)
-                    .offset(x: 58, y: -62)
-            }
-            .offset(y: 8)
+        Tile(colors: [Color(red: 0.80, green: 0.76, blue: 1.00), Color(red: 0.45, green: 0.38, blue: 0.90)]) {
+            Emoji(file: "eyes_3d.png", size: 580).offset(y: 6)
         }
     }
 }

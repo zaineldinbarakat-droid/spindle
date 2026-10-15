@@ -94,8 +94,7 @@ struct NotchRootView: View {
                 if timer.isActive {
                     CollapsedCountdown()
                 } else if viewModel.showVisualizer {
-                    VisualizerView(isPlaying: player.snapshot.isPlaying,
-                                   accent: viewModel.style == .black ? player.accent : .white.opacity(0.9))
+                    VisualizerView(isPlaying: player.snapshot.isPlaying, accent: player.accent)
                 }
             }
             .padding(.trailing, Theme.notchCornerRadius + 2)

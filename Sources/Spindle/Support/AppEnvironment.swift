@@ -1,4 +1,5 @@
 import SwiftUI
+import SpindleSync
 
 /// Shared references to the long-lived objects.
 ///
@@ -13,6 +14,7 @@ final class AppEnvironment {
     let notch = NotchViewModel()
     let timer: PomodoroTimer
     let desktop: DesktopController
+    let updater = Updater(appName: "Spindle")
 
     private init() {
         let player = PlayerManager()
