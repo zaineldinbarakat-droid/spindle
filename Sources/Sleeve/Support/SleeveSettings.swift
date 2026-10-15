@@ -17,13 +17,12 @@ final class SleeveSettings: ObservableObject {
     /// The look of Sleeve's menu bar icon. Every style has two faces, like Ice's
     /// image sets: one while apps are tucked away, one while they're showing.
     enum ToggleIcon: String, CaseIterable, Identifiable, Codable {
-        case emoji, eye, dot, ellipsis, chevron, door
+        case eye, dot, ellipsis, chevron, door
         case record = "sleeve"
         case custom
         var id: String { rawValue }
         var title: String {
             switch self {
-            case .emoji: return "Emoji 🫥 👀"
             case .eye: return "Eye"
             case .dot: return "Dot"
             case .ellipsis: return "Ellipsis"
@@ -33,11 +32,11 @@ final class SleeveSettings: ObservableObject {
             case .custom: return "Custom Image"
             }
         }
-        /// (hidden, showing). Emoji are drawn as text; the rest are SF Symbols.
+        /// (hidden, showing) SF Symbol names.
         var faces: (hidden: String, shown: String) {
             switch self {
-            case .emoji: return ("🫥", "👀")
-            case .eye: return ("eye.slash", "eye.fill")
+            // An empty outline while apps are tucked away, filled in while you look.
+            case .eye: return ("eye", "eye.fill")
             case .dot: return ("circle", "circle.fill")
             case .ellipsis: return ("ellipsis.circle", "ellipsis.circle.fill")
             case .chevron: return ("chevron.compact.left", "chevron.compact.right")
@@ -68,6 +67,9 @@ final class SleeveSettings: ObservableObject {
     @Published var revealOnHover: Bool { didSet { save(revealOnHover, "revealOnHover") } }
     /// Hovering over Sleeve's own icon reveals, like pointing at Ice's icon.
     @Published var revealOnIconHover: Bool { didSet { save(revealOnIconHover, "revealOnIconHover") } }
+    /// Two-finger click (secondary click) on Sleeve's icon or an empty part of the
+    /// menu bar shows or hides the hidden apps. The menu moves to ⌃-click.
+    @Published var revealOnTwoFingerClick: Bool { didSet { save(revealOnTwoFingerClick, "revealOnTwoFingerClick") } }
     /// PNG for the Custom icon style, scaled to menu bar size.
     @Published var customIconData: Data? { didSet { store.set(customIconData, forKey: "customIconData") } }
     @Published var revealOnScroll: Bool { didSet { save(revealOnScroll, "revealOnScroll") } }
@@ -123,16 +125,21 @@ final class SleeveSettings: ObservableObject {
         func bool(_ key: String, _ fallback: Bool) -> Bool {
             d.object(forKey: key) == nil ? fallback : d.bool(forKey: key)
         }
-        // v3: the emoji icon and icon hover arrived together, and the native-hiding
-        // switch may have been turned off while the cover froze Sleeve (fixed in v3);
-        // bring all three to the new defaults once.
+        // v3: icon hover arrived, and the native-hiding switch may have been turned
+        // off while the cover froze Sleeve (fixed in v3); bring both to the new
+        // defaults once.
         if d.integer(forKey: "settingsVersion") < 3 {
             d.set(3, forKey: "settingsVersion")
-            d.set(ToggleIcon.emoji.rawValue, forKey: "toggleIcon")
             d.set(true, forKey: "useNativeHiding")
             d.set(true, forKey: "revealOnIconHover")
         }
-        toggleIcon = ToggleIcon(rawValue: d.string(forKey: "toggleIcon") ?? "") ?? .emoji
+        // v4: the emoji style is gone; whoever had it gets the eye.
+        if d.integer(forKey: "settingsVersion") < 4 {
+            d.set(4, forKey: "settingsVersion")
+            if d.string(forKey: "toggleIcon") == "emoji" { d.set(ToggleIcon.eye.rawValue, forKey: "toggleIcon") }
+        }
+        toggleIcon = ToggleIcon(rawValue: d.string(forKey: "toggleIcon") ?? "") ?? .eye
+        revealOnTwoFingerClick = bool("revealOnTwoFingerClick", true)
         revealOnIconHover = bool("revealOnIconHover", true)
         customIconData = d.data(forKey: "customIconData")
         revealOnHover = bool("revealOnHover", true)

@@ -33,6 +33,9 @@ final class RevealGestures {
         monitors.append(NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDown) { [weak self] _ in
             Task { @MainActor in self?.clicked() }
         } as Any)
+        monitors.append(NSEvent.addGlobalMonitorForEvents(matching: .rightMouseDown) { [weak self] _ in
+            Task { @MainActor in self?.twoFingerClicked() }
+        } as Any)
 
         NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
@@ -89,16 +92,31 @@ final class RevealGestures {
             hoverWork = nil
             return
         }
-        guard hoverWork == nil else { return }
-        // A short dwell, so sweeping across the bar on the way to a menu doesn't flash
-        // everything open.
-        let work = DispatchWorkItem { [weak self] in
-            guard let self else { return }
-            self.hoverWork = nil
-            if self.isOverEmptyBar(NSEvent.mouseLocation) { self.reveal() }
+        // No dwell: reaching the bar is enough.
+        reveal()
+    }
+
+    /// Two-finger click on an empty stretch of the bar shows or hides the hidden apps.
+    /// Never over an icon: other apps' icons keep their own right-click menus.
+    private func twoFingerClicked() {
+        guard settings.revealOnTwoFingerClick else { return }
+        let point = NSEvent.mouseLocation
+        // On macOS 27 a secondary click on Sleeve's own icon arrives here too (the
+        // button often never sees it), so it's handled here; the button's own path is
+        // de-duplicated in `toggleForUser`.
+        guard isInBar(point), !isOverAnyIcon(point), point.x > appMenusEnd + 8 else { return }
+        if let screen = NSScreen.screens.first, let l = screen.auxiliaryTopLeftArea,
+           let r = screen.auxiliaryTopRightArea, screen.safeAreaInsets.top > 0,
+           point.x > l.maxX - 4, point.x < r.minX + 4 {
+            return
         }
-        hoverWork = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: work)
+        sections.toggleForUser()
+    }
+
+    private func isOverAnyIcon(_ point: CGPoint) -> Bool {
+        sections.items.contains { item in
+            sections.isLive(item) && !item.isOverflowed && item.frame.insetBy(dx: -2, dy: -4).contains(point)
+        }
     }
 
     private func scrolled(_ dy: CGFloat) {

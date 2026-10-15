@@ -420,7 +420,10 @@ final class SectionManager: ObservableObject {
         updateIcons()
         if changed { onStateChange?(new) }
         Task { await rescanSoon() }
-        if new == .collapsed { rehideTimer?.invalidate() }
+        if new == .collapsed {
+            rehideTimer?.invalidate()
+            stopWatchingCursor()
+        }
     }
 
     /// Hide-all doesn't use sections, so the dividers shrink to nothing and leave
@@ -435,11 +438,8 @@ final class SectionManager: ObservableObject {
         nativeGeneration += 1
         let generation = nativeGeneration
         Task {
-            // Read the layout first, from whatever is live; removed icons keep the
-            // section they had when last seen.
-            await rescanSoon(after: 60)
-            guard generation == nativeGeneration else { return }
-
+            // Hide-all's allow-list never depends on where icons are, so act at once:
+            // any scan here would sit between the cursor and the bar changing.
             if settings.hideAllApps {
                 guard target == .collapsed else {
                     releaseRestriction()
@@ -451,6 +451,16 @@ final class SectionManager: ObservableObject {
                                        describing: "every app except \(allowed.sorted())")
                 return
             }
+
+            // Showing everything needs no layout either.
+            if target == .all {
+                releaseRestriction()
+                return
+            }
+            // Sections: use the layout from the last scan (refreshed every 3 s and
+            // after every change); only scan first if there's nothing to go on.
+            if items.isEmpty { await rescanSoon(after: 0) }
+            guard generation == nativeGeneration else { return }
 
             let hiding: Set<MenuBarSection>
             switch target {
@@ -528,6 +538,7 @@ final class SectionManager: ObservableObject {
 
     func scheduleRehide() {
         rehideTimer?.invalidate()
+        stopWatchingCursor()
         guard pinnedByRule == nil else { return }
         switch settings.rehideMode {
         case .never:
@@ -540,24 +551,54 @@ final class SectionManager: ObservableObject {
                 }
             }
         case .smart:
-            // Poll gently; a mouse monitor would fire hundreds of times a second for a
-            // decision that only needs to be right within half a second.
-            var awaySince: Date?
-            rehideTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] timer in
-                Task { @MainActor in
-                    guard let self else { timer.invalidate(); return }
-                    if self.isCursorInMenuBarOrBar() || Self.isAnyMenuOpen() {
-                        awaySince = nil
-                        return
-                    }
-                    if awaySince == nil { awaySince = .now }
-                    if let since = awaySince, Date.now.timeIntervalSince(since) > 0.6 {
-                        timer.invalidate()
-                        self.collapse()
-                    }
-                }
+            startWatchingCursor()
+        }
+    }
+
+    // MARK: - Instant rehide
+
+    private var cursorMonitors: [Any] = []
+    private var lastMenuCheck = Date.distantPast
+    private var menuWasOpen = false
+
+    /// Hides the moment the cursor leaves the menu bar (or the Sleeve Bar) — driven by
+    /// the cursor's own movement, so there's no polling delay. An open menu holds
+    /// everything in place, or the icon would vanish from under its own menu.
+    private func startWatchingCursor() {
+        stopWatchingCursor()
+        let handler: () -> Void = { [weak self] in
+            guard let self, self.state != .collapsed else { return }
+            if self.isCursorInMenuBarOrBar() { return }
+            // Asking the window server whether a menu is open costs a little, so do
+            // it at most every 80 ms while the cursor roams outside the bar.
+            if Date.now.timeIntervalSince(self.lastMenuCheck) > 0.08 {
+                self.lastMenuCheck = .now
+                self.menuWasOpen = Self.isAnyMenuOpen()
+            }
+            if !self.menuWasOpen { self.collapse() }
+        }
+        let events: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDragged, .rightMouseDragged]
+        if let global = NSEvent.addGlobalMonitorForEvents(matching: events, handler: { _ in
+            Task { @MainActor in handler() }
+        }) { cursorMonitors.append(global) }
+        if let local = NSEvent.addLocalMonitorForEvents(matching: events, handler: { event in
+            Task { @MainActor in handler() }
+            return event
+        }) { cursorMonitors.append(local) }
+        // A menu closing doesn't move the cursor; check now and then while one is open.
+        rehideTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                guard let self, self.menuWasOpen else { return }
+                self.lastMenuCheck = .distantPast
+                handler()
             }
         }
+    }
+
+    private func stopWatchingCursor() {
+        cursorMonitors.forEach { NSEvent.removeMonitor($0) }
+        cursorMonitors.removeAll()
+        menuWasOpen = false
     }
 
     /// Extra rect that counts as "still in the menu bar" — the Sleeve Bar, when open.
@@ -619,6 +660,12 @@ final class SectionManager: ObservableObject {
 
     @objc private func toggleClicked(_ sender: NSStatusBarButton) {
         let event = NSApp.currentEvent
+        // Two-finger click (a secondary click) shows or hides; the menu is on ⌃-click.
+        if event?.type == .rightMouseUp && settings.revealOnTwoFingerClick
+            && event?.modifierFlags.contains(.control) != true {
+            toggleForUser()
+            return
+        }
         if event?.type == .rightMouseUp || event?.modifierFlags.contains(.control) == true {
             if let menu = menuProvider?() {
                 toggleItem.menu = menu
@@ -647,7 +694,6 @@ final class SectionManager: ObservableObject {
     // MARK: - Hovering Sleeve's icon
 
     private let iconHover = IconHoverTracker()
-    private var iconHoverWork: DispatchWorkItem?
     /// Called to reveal from a hover when the Sleeve Bar is the reveal style.
     var onHoverRevealForBar: (() -> Void)?
 
@@ -655,26 +701,36 @@ final class SectionManager: ObservableObject {
         isHoveringIcon = true
         updateIcons()
         guard settings.revealOnIconHover, state == .collapsed else { return }
-        // A brief dwell so the cursor merely passing over the icon doesn't fire it.
-        let work = DispatchWorkItem { [weak self] in
-            guard let self, self.isHoveringIcon, self.state == .collapsed else { return }
-            if self.settings.hideAllApps {
-                self.reveal(.all)
-            } else if self.settings.useSleeveBar {
-                self.onHoverRevealForBar?()
-            } else {
-                self.reveal(.hidden)
-            }
+        // No dwell: the moment the cursor touches the icon, the apps come out.
+        revealForUser()
+    }
+
+    /// Reveal the way the user's settings ask for: everything in hide-all mode, the
+    /// Sleeve Bar if that's the reveal style, otherwise the Hidden section in place.
+    func revealForUser() {
+        if settings.hideAllApps {
+            reveal(.all)
+        } else if settings.useSleeveBar {
+            onHoverRevealForBar?()
+        } else {
+            reveal(.hidden)
         }
-        iconHoverWork?.cancel()
-        iconHoverWork = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: work)
+    }
+
+    /// Two-finger click: show if hidden, hide if shown.
+    private var lastUserToggle = Date.distantPast
+
+    func toggleForUser() {
+        // One physical click can reach Sleeve twice on macOS 27 (the menu bar reports
+        // the button-down to the global monitor and the button-up to the button);
+        // treat anything within 0.35 s as the same click.
+        guard Date.now.timeIntervalSince(lastUserToggle) > 0.35 else { return }
+        lastUserToggle = .now
+        state == .collapsed ? revealForUser() : collapse()
     }
 
     private func iconHoverEnded() {
         isHoveringIcon = false
-        iconHoverWork?.cancel()
-        iconHoverWork = nil
         updateIcons()
         // Hiding again is left to auto-rehide, which waits until the cursor has left
         // the whole menu bar — revealed icons can shift the bar under the cursor.
@@ -706,13 +762,6 @@ final class SectionManager: ObservableObject {
         let face = showing ? style.faces.shown : style.faces.hidden
 
         switch style {
-        case .emoji:
-            // Emoji are text: colour, no template tinting.
-            button.image = nil
-            button.imagePosition = .noImage
-            button.attributedTitle = NSAttributedString(
-                string: face,
-                attributes: [.font: NSFont.systemFont(ofSize: 14), .baselineOffset: -1])
         case .custom:
             button.title = ""
             button.imagePosition = .imageOnly

@@ -32,6 +32,8 @@ final class SleeveBarController {
     }
 
     func open(includeAlwaysHidden: Bool = false) {
+        // Hover reveal fires on every cursor move; an open bar must not re-fade.
+        guard !isOpen else { return }
         model.includeAlwaysHidden = includeAlwaysHidden || NSEvent.modifierFlags.contains(.option)
         refreshItems()
         sections.rescan()

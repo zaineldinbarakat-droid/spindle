@@ -125,10 +125,13 @@ private struct GeneralTab: View {
             Section("Sleeve's icon") {
                 IconStylePicker()
                 Toggle("Reveal when hovering over Sleeve's icon", isOn: $settings.revealOnIconHover)
+                Toggle("Two-finger click shows or hides hidden apps", isOn: $settings.revealOnTwoFingerClick)
                 if !settings.hideAllApps {
                     Toggle("Show hidden icons in the Sleeve Bar (recommended on notched Macs)", isOn: $settings.useSleeveBar)
                 }
-                Text("Hover or click the icon to reveal · ⌥-click shows Always Hidden too · right-click for the menu. Tip: ⌘-drag Sleeve's icon next to the clock, so revealed apps appear to its left and it stays put under your cursor.")
+                Text(settings.revealOnTwoFingerClick
+                     ? "Two-finger click Sleeve's icon or an empty part of the menu bar to show or hide · ⌃-click the icon for the menu. Tip: ⌘-drag Sleeve's icon next to the clock, so revealed apps appear to its left and it stays put under your cursor."
+                     : "Click the icon to reveal · ⌥-click shows Always Hidden too · right-click for the menu. Tip: ⌘-drag Sleeve's icon next to the clock, so revealed apps appear to its left and it stays put under your cursor.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             if SectionManager.isModernMenuBar {
@@ -199,7 +202,7 @@ private struct IconStylePicker: View {
                             face(style, showing: true)
                         }
                         .frame(height: 22)
-                        Text(style == .emoji ? "Emoji" : style.title).font(.caption)
+                        Text(style.title).font(.caption)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
@@ -220,8 +223,6 @@ private struct IconStylePicker: View {
     private func face(_ style: SleeveSettings.ToggleIcon, showing: Bool) -> some View {
         let name = showing ? style.faces.shown : style.faces.hidden
         switch style {
-        case .emoji:
-            Text(name).font(.system(size: 15))
         case .custom:
             if let data = settings.customIconData, let image = NSImage(data: data) {
                 Image(nsImage: image).resizable().frame(width: 16, height: 16).opacity(showing ? 1 : 0.5)
