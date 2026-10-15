@@ -64,9 +64,6 @@ final class SleeveSettings: ObservableObject {
     }
 
     @Published var toggleIcon: ToggleIcon { didSet { save(toggleIcon.rawValue, "toggleIcon") } }
-    /// Off: no Sleeve icon at all — hovering the menu bar is the whole interface.
-    /// Settings then open when Sleeve is launched again (Spotlight, Finder).
-    @Published var showIcon: Bool { didSet { save(showIcon, "showIcon") } }
     @Published var revealOnHover: Bool { didSet { save(revealOnHover, "revealOnHover") } }
     /// Hovering over Sleeve's own icon reveals, like pointing at Ice's icon.
     @Published var revealOnIconHover: Bool { didSet { save(revealOnIconHover, "revealOnIconHover") } }
@@ -143,7 +140,7 @@ final class SleeveSettings: ObservableObject {
         }
         toggleIcon = ToggleIcon(rawValue: d.string(forKey: "toggleIcon") ?? "") ?? .eye
         revealOnTwoFingerClick = bool("revealOnTwoFingerClick", true)
-        showIcon = bool("showIcon", true)
+        d.removeObject(forKey: "showIcon")  // the icon is always shown now
         revealOnIconHover = bool("revealOnIconHover", true)
         customIconData = d.data(forKey: "customIconData")
         revealOnHover = bool("revealOnHover", true)

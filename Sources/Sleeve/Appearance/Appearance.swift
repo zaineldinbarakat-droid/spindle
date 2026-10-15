@@ -55,6 +55,9 @@ struct MenuBarStyle: Codable, Equatable {
     var gradientStops: [GradientStop] = []
     /// Direction in degrees: 0 runs left → right, 90 top → bottom.
     var gradientAngle: Double = 0
+    /// How strongly the tint shows. It's drawn over the whole menu bar, icons and
+    /// all (the way Ice does it), so it stays light: 0.2 is Ice's own strength.
+    var intensity: Double = 0.2
     var shape: Shape = .full
     var cornerRadius: Double = 10
     /// Gap from the screen edge (and top) for the Rounded and Split shapes.
@@ -102,11 +105,12 @@ struct MenuBarStyle: Codable, Equatable {
          color2: RGBA = RGBA(r: 0.30, g: 0.16, b: 0.40, a: 0.85),
          gradientStops: [GradientStop] = [],
          gradientAngle: Double = 0,
+         intensity: Double = 0.2,
          shape: Shape = .full, cornerRadius: Double = 10, inset: Double = 4,
          shadow: Bool = false, shadowOpacity: Double = 0.35,
          border: Bool = false, borderColor: RGBA = RGBA(r: 1, g: 1, b: 1, a: 0.25), borderWidth: Double = 1) {
         self.fill = fill; self.color1 = color1; self.color2 = color2
-        self.gradientStops = gradientStops; self.gradientAngle = gradientAngle
+        self.gradientStops = gradientStops; self.gradientAngle = gradientAngle; self.intensity = intensity
         self.shape = shape; self.cornerRadius = cornerRadius; self.inset = inset
         self.shadow = shadow; self.shadowOpacity = shadowOpacity
         self.border = border; self.borderColor = borderColor; self.borderWidth = borderWidth
@@ -121,6 +125,7 @@ struct MenuBarStyle: Codable, Equatable {
         color2 = try c.decodeIfPresent(RGBA.self, forKey: .color2) ?? d.color2
         gradientStops = try c.decodeIfPresent([GradientStop].self, forKey: .gradientStops) ?? []
         gradientAngle = try c.decodeIfPresent(Double.self, forKey: .gradientAngle) ?? 0
+        intensity = try c.decodeIfPresent(Double.self, forKey: .intensity) ?? d.intensity
         shape = try c.decodeIfPresent(Shape.self, forKey: .shape) ?? d.shape
         cornerRadius = try c.decodeIfPresent(Double.self, forKey: .cornerRadius) ?? d.cornerRadius
         inset = try c.decodeIfPresent(Double.self, forKey: .inset) ?? d.inset
@@ -140,23 +145,19 @@ struct MenuBarStyle: Codable, Equatable {
 
     static let presets: [(String, MenuBarStyle)] = [
         ("Off", MenuBarStyle()),
-        ("Midnight", MenuBarStyle(fill: .solid, color1: RGBA(r: 0.05, g: 0.05, b: 0.07, a: 0.92))),
-        ("Sunset", MenuBarStyle(fill: .gradient, gradientStops: stops([(0.99, 0.70, 0.35), (0.95, 0.40, 0.40),
-                                                                       (0.55, 0.25, 0.75)], alpha: 0.78))),
-        ("Aurora", MenuBarStyle(fill: .gradient, gradientStops: stops([(0.20, 0.85, 0.65), (0.25, 0.55, 0.95),
-                                                                       (0.60, 0.35, 0.95), (0.95, 0.40, 0.75)], alpha: 0.72))),
-        ("Ice", MenuBarStyle(fill: .gradient, gradientStops: stops([(0.75, 0.92, 1.0), (0.45, 0.70, 0.98)], alpha: 0.6),
-                             shape: .split, cornerRadius: 14, border: true)),
-        ("Neon", MenuBarStyle(fill: .gradient, gradientStops: stops([(1.0, 0.20, 0.60), (0.55, 0.20, 1.0),
-                                                                   (0.10, 0.80, 1.0)], alpha: 0.75),
-                              shape: .rounded, shadow: true)),
-        ("Walnut", MenuBarStyle(fill: .gradient,
-                                color1: RGBA(r: 0.36, g: 0.22, b: 0.13, a: 0.9),
-                                color2: RGBA(r: 0.17, g: 0.10, b: 0.06, a: 0.9),
-                                shape: .rounded, shadow: true)),
-        ("Floating Capsules", MenuBarStyle(fill: .solid, color1: RGBA(r: 0.1, g: 0.1, b: 0.12, a: 0.8),
-                                           shape: .split, cornerRadius: 14, shadow: true,
-                                           border: true))
+        ("Midnight", MenuBarStyle(fill: .solid, color1: RGBA(r: 0.0, g: 0.0, b: 0.05), intensity: 0.45)),
+        ("Sunset", MenuBarStyle(fill: .gradient, gradientStops: stops([(1.0, 0.62, 0.20), (0.98, 0.30, 0.40),
+                                                                       (0.55, 0.20, 0.85)], alpha: 1), intensity: 0.28)),
+        ("Aurora", MenuBarStyle(fill: .gradient, gradientStops: stops([(0.10, 0.90, 0.60), (0.20, 0.55, 1.0),
+                                                                       (0.60, 0.30, 1.0), (1.0, 0.35, 0.75)], alpha: 1), intensity: 0.26)),
+        ("Ice", MenuBarStyle(fill: .gradient, gradientStops: stops([(0.70, 0.92, 1.0), (0.35, 0.65, 1.0)], alpha: 1),
+                             intensity: 0.25, border: true, borderColor: RGBA(r: 1, g: 1, b: 1, a: 0.35))),
+        ("Neon", MenuBarStyle(fill: .gradient, gradientStops: stops([(1.0, 0.10, 0.60), (0.55, 0.15, 1.0),
+                                                                   (0.0, 0.85, 1.0)], alpha: 1), intensity: 0.3, shadow: true)),
+        ("Walnut", MenuBarStyle(fill: .gradient, gradientStops: stops([(0.45, 0.28, 0.16), (0.20, 0.11, 0.06)], alpha: 1),
+                                intensity: 0.4, shadow: true)),
+        ("Floating Capsules", MenuBarStyle(fill: .solid, color1: RGBA(r: 0.1, g: 0.1, b: 0.12),
+                                           intensity: 0.4, shape: .split, cornerRadius: 14, shadow: true, border: true))
     ]
 }
 

@@ -136,6 +136,7 @@ final class SectionManager: ObservableObject {
             button.action = #selector(toggleClicked(_:))
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
             button.setAccessibilityLabel("Sleeve")
+            installIconView(in: button)
             // Enter/exit events still reach a status item's button on macOS 27, even
             // though MenuBarAgent draws it (checked with a test item).
             button.addTrackingArea(NSTrackingArea(rect: .zero,
@@ -150,9 +151,8 @@ final class SectionManager: ObservableObject {
         settings.$toggleIcon.combineLatest(settings.$customIconData).sink { [weak self] _, _ in
             DispatchQueue.main.async { self?.updateIcons() }
         }.store(in: &cancellables)
-        settings.$showIcon.sink { [weak self] show in
-            DispatchQueue.main.async { self?.toggleItem.isVisible = show }
-        }.store(in: &cancellables)
+        // Sleeve's icon is always in the bar.
+        toggleItem.isVisible = true
         iconHover.onEnter = { [weak self] in self?.iconHoverBegan() }
         iconHover.onExit = { [weak self] in self?.iconHoverEnded() }
         // Changing how or what to hide re-applies the current state the new way.
@@ -724,7 +724,8 @@ final class SectionManager: ObservableObject {
     /// Called to reveal from a hover when the Sleeve Bar is the reveal style.
     var onHoverRevealForBar: (() -> Void)?
 
-    private func iconHoverBegan() {
+    func iconHoverBegan() {
+        guard !isHoveringIcon else { return }
         isHoveringIcon = true
         updateIcons()
         guard settings.revealOnIconHover, state == .collapsed else { return }
@@ -756,7 +757,8 @@ final class SectionManager: ObservableObject {
         state == .collapsed ? revealForUser() : collapse()
     }
 
-    private func iconHoverEnded() {
+    func iconHoverEnded() {
+        guard isHoveringIcon else { return }
         isHoveringIcon = false
         updateIcons()
         // Hiding again is left to auto-rehide, which waits until the cursor has left
@@ -780,36 +782,69 @@ final class SectionManager: ObservableObject {
 
     /// True while the cursor is over Sleeve's icon — the icon shows its "looking"
     /// face straight away, before anything has been revealed.
-    private var isHoveringIcon = false
+    private(set) var isHoveringIcon = false
+
+    /// The icon is drawn by our own image view rather than the button's image, so the
+    /// change between faces can animate: SF Symbols morph from one to the other, and
+    /// the "showing" face gives a little bounce as the apps come out.
+    private let iconView = MenuIconView()
+    private var shownFace: (style: SleeveSettings.ToggleIcon, showing: Bool)?
+
+    private func installIconView(in button: NSStatusBarButton) {
+        button.image = nil
+        button.title = ""
+        button.imagePosition = .noImage
+        iconView.translatesAutoresizingMaskIntoConstraints = false
+        iconView.imageScaling = .scaleProportionallyDown
+        button.addSubview(iconView)
+        NSLayoutConstraint.activate([
+            iconView.centerXAnchor.constraint(equalTo: button.centerXAnchor),
+            iconView.centerYAnchor.constraint(equalTo: button.centerYAnchor),
+            iconView.widthAnchor.constraint(equalToConstant: 20),
+            iconView.heightAnchor.constraint(equalToConstant: 18)
+        ])
+        // With no image of its own the button would collapse to nothing.
+        toggleItem.length = 26
+    }
 
     private func updateIcons() {
-        guard let button = toggleItem.button else { return }
         let showing = state != .collapsed || isHoveringIcon
         let style = settings.toggleIcon
-        let face = showing ? style.faces.shown : style.faces.hidden
+        let previous = shownFace
+        shownFace = (style, showing)
+        // Only a change of face animates; a change of style just swaps.
+        let animate = previous != nil && previous?.style == style && previous?.showing != showing
 
         switch style {
         case .custom:
-            button.title = ""
-            button.imagePosition = .imageOnly
             let image = settings.customIconData.flatMap(NSImage.init(data:))
                 ?? NSImage(systemSymbolName: "questionmark.circle", accessibilityDescription: nil)
             image?.size = NSSize(width: 18, height: 18)
-            button.image = image
+            iconView.image = image
             // One picture, two moods: dimmed while apps are tucked away.
-            button.alphaValue = showing ? 1 : 0.5
+            if animate {
+                NSAnimationContext.runAnimationGroup { context in
+                    context.duration = 0.2
+                    iconView.animator().alphaValue = showing ? 1 : 0.5
+                }
+            } else {
+                iconView.alphaValue = showing ? 1 : 0.5
+            }
         default:
-            button.title = ""
-            button.imagePosition = .imageOnly
-            let small = style == .dot
-            let config = NSImage.SymbolConfiguration(pointSize: small ? 9 : 13, weight: showing ? .semibold : .regular)
-            let image = NSImage(systemSymbolName: face, accessibilityDescription: "Sleeve")?
-                .withSymbolConfiguration(config)
-            image?.isTemplate = true
-            button.image = image
-            button.alphaValue = 1
+            iconView.alphaValue = 1
+            let face = showing ? style.faces.shown : style.faces.hidden
+            let config = NSImage.SymbolConfiguration(pointSize: style == .dot ? 10 : 14,
+                                                     weight: showing ? .semibold : .regular)
+            guard let image = NSImage(systemSymbolName: face, accessibilityDescription: "Sleeve")?
+                .withSymbolConfiguration(config) else { break }
+            image.isTemplate = true
+            if animate {
+                iconView.setSymbolImage(image, contentTransition: .replace.downUp.byLayer)
+                if showing { iconView.addSymbolEffect(.bounce.up.byLayer, options: .nonRepeating) }
+            } else {
+                iconView.image = image
+            }
         }
-        if style != .custom { button.alphaValue = 1 }
 
         // Dividers show a faint tick so the user can see where to drop icons. With the
         // classic method a collapsed divider is a long invisible spacer instead.
@@ -871,4 +906,10 @@ final class IconHoverTracker: NSResponder {
     override func mouseExited(with event: NSEvent) {
         DispatchQueue.main.async { self.onExit?() }
     }
+}
+
+/// Sleeve's icon. Never takes the click itself, so the status button underneath still
+/// gets it.
+final class MenuIconView: NSImageView {
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }

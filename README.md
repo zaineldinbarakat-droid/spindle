@@ -61,13 +61,12 @@ of the screen.
   bar have no delay (measured on macOS 27: ~100 ms to show, ~70 ms to hide, including
   macOS redrawing the bar), with a little spatial slack so resting on the bar's edge
   never flickers. An open menu holds things in place.
-- **No icon, if you like.** Turn Sleeve's icon off and the menu bar itself is the
-  interface: hover to show, move away to hide. Open Sleeve again to get to Settings.
 - **Two-finger click** on Sleeve's icon or an empty part of the bar shows or hides the
   hidden apps (⌃-click the icon for Sleeve's menu).
-- **An icon with two faces,** like Ice's image sets: an outlined eye while your apps are
-  tucked away, a filled one while they're showing — or dot, ellipsis, chevron, door,
-  record, or your own image.
+- **An icon with two faces,** like Ice's image sets, always in the bar: an outlined eye
+  while your apps are tucked away; hover it and it morphs into the filled eye with a
+  little bounce as they come out, and morphs back when you move away. Or dot, ellipsis,
+  chevron, door, record, or your own image.
 - **Three sections** (with hide-all off). Visible, Hidden and Always Hidden, separated by Sleeve's toggle and
   two faint │ dividers. ⌘-drag icons across the dividers. On macOS 14–26 you can also
   drag them between the columns in *Settings → Layout* and Sleeve performs the ⌘-drag
@@ -78,7 +77,10 @@ of the screen.
   a delay, or never.
 - **Sleeve Bar.** A floating drawer under the menu bar that lists hidden icons, so on a
   notched MacBook they can't end up behind the camera. Click one and its real menu opens.
-- **Styling.** Solid tints or multi-stop gradients (add, drag and recolour stops, set
+- **Menu bar color, the Ice way.** A light tint laid over the whole menu bar — edge to
+  edge, flush with the top of the screen, notch and all — at an adjustable intensity
+  (20% by default, Ice's own strength), so icons and menus show through tinted.
+  Solid tints or multi-stop gradients (add, drag and recolour stops, set
   any angle; Sunset, Aurora, Ice and Neon presets), Full / Rounded / Split-capsule shapes, shadows and
   borders, with a separate Dark Mode style and per-display overrides.
 - **Spacing.** A slider for icon spacing (applied by restarting the apps that own icons).

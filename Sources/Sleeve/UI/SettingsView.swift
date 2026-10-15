@@ -133,19 +133,6 @@ private struct GeneralTab: View {
                      : "Only icons you ⌘-drag into the Hidden sections are hidden.")
                     .font(.caption).foregroundStyle(.secondary)
             }
-            Section("Sleeve's icon") {
-                Toggle("Show Sleeve's icon in the menu bar", isOn: Binding(
-                    get: { settings.showIcon },
-                    set: { show in
-                        settings.showIcon = show
-                        // Without the icon, hovering the bar is the only way in.
-                        if !show { settings.revealOnHover = true }
-                    }))
-                if !settings.showIcon {
-                    Text("Just hover over the menu bar to show your apps and move away to hide them. To get back here, open Sleeve again from Spotlight or Finder.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-            }
             Section("Icon style") {
                 IconStylePicker()
                 Toggle("Reveal when hovering over Sleeve's icon", isOn: $settings.revealOnIconHover)
@@ -550,14 +537,18 @@ private struct AppearanceTab: View {
     var body: some View {
         Form {
             Section {
-                MenuBarStyleView(style: binding.wrappedValue, layout: BarLayout(
-                    size: CGSize(width: 540, height: 40), barHeight: 30,
-                    appMenusEnd: 170, statusStart: 360, notch: nil))
-                    .frame(width: 540, height: 40)
-                    .background(LinearGradient(colors: [.blue.opacity(0.5), .purple.opacity(0.4)],
-                                               startPoint: .leading, endPoint: .trailing))
-                    .overlay(alignment: .topLeading) { previewContents }
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                // Wallpaper, then the bar's contents, then the tint over everything —
+                // the same stacking as on the real menu bar.
+                ZStack(alignment: .topLeading) {
+                    LinearGradient(colors: [Color(red: 0.25, green: 0.45, blue: 0.75), Color(red: 0.55, green: 0.35, blue: 0.70)],
+                                   startPoint: .leading, endPoint: .trailing)
+                    previewContents
+                    MenuBarStyleView(style: binding.wrappedValue, layout: BarLayout(
+                        size: CGSize(width: 540, height: 30 + MenuBarStyleView.shadowDepth), barHeight: 30,
+                        appMenusEnd: 170, statusStart: 360, notch: nil))
+                }
+                .frame(width: 540, height: 46)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
             }
 
             Section {
@@ -587,6 +578,14 @@ private struct AppearanceTab: View {
                     ForEach(MenuBarStyle.Fill.allCases) { Text($0.title).tag($0) }
                 }
                 .pickerStyle(.segmented)
+                if binding.wrappedValue.fill != .none {
+                    LabeledContent("Intensity") {
+                        HStack {
+                            Slider(value: binding.intensity, in: 0.05...0.8)
+                            Text("\(Int(binding.wrappedValue.intensity * 100))%").monospacedDigit().frame(width: 40)
+                        }
+                    }
+                }
                 if binding.wrappedValue.fill == .solid {
                     ColorPicker("Color", selection: colorBinding(binding.color1))
                 }

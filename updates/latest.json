@@ -1,5 +1,5 @@
 {
-  "version": "0.3.1",
-  "notes": "A new, cleaner Sleeve icon.",
+  "version": "0.3.2",
+  "notes": "Sleeve's icon is always shown and animates as your apps open and close; the menu bar color now sits across the very top like Ice, with an intensity slider.",
   "minimumSystemVersion": "14.0"
 }

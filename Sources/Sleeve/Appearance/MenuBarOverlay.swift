@@ -15,11 +15,9 @@ struct BarLayout: Equatable {
     var notch: ClosedRange<CGFloat>?
 }
 
-/// Draws the chosen style *behind* the menu bar's contents.
-///
-/// The panel sits one level under the menu bar, so icons and menu titles draw on top of
-/// it and it never takes a click. That relies on the menu bar itself being transparent
-/// (the default since macOS 26; "Show menu bar background" must be off).
+/// Draws the chosen style across the menu bar: a light tint laid over the whole strip,
+/// edge to edge and flush with the top of the screen — notch and all — as Ice does.
+/// It never takes a click.
 @MainActor
 final class MenuBarOverlayController {
     private var panels: [CGDirectDisplayID: NSPanel] = [:]
@@ -82,9 +80,10 @@ final class MenuBarOverlayController {
             seen.insert(id)
 
             let barHeight = MenuBarGeometry.height(of: screen)
-            // Extra room below the bar for the drop shadow.
-            let frame = CGRect(x: screen.frame.minX, y: screen.frame.maxY - barHeight - 16,
-                               width: screen.frame.width, height: barHeight + 16)
+            // The bar, flush with the top of the screen, plus room for the shadow fade.
+            let depth = MenuBarStyleView.shadowDepth
+            let frame = CGRect(x: screen.frame.minX, y: screen.frame.maxY - barHeight - depth,
+                               width: screen.frame.width, height: barHeight + depth)
             let panel = panels[id] ?? makePanel()
             panels[id] = panel
             panel.setFrame(frame, display: false)
@@ -137,8 +136,12 @@ final class MenuBarOverlayController {
         panel.backgroundColor = .clear
         panel.hasShadow = false
         panel.ignoresMouseEvents = true
-        // Directly beneath the menu bar's own layer.
-        panel.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.mainMenuWindow)) - 1)
+        // On top of the menu bar, the way Ice does it. Underneath would be cleaner in
+        // theory, but on macOS 27 the menu bar draws its own background and icons in a
+        // single window, so a tint below it may never be seen. Above, at Ice's
+        // strength, everything shows through tinted. Clicks pass straight through, and
+        // Spindle's notch panel (a few levels higher) stays on top.
+        panel.level = .statusBar
         panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenNone]
         panel.animationBehavior = .none
         return panel
@@ -175,17 +178,41 @@ struct MenuBarStyleView: View {
     var style: MenuBarStyle
     var layout: BarLayout
 
+    /// Ice's shadow: a short fade below the bar's bottom edge.
+    static let shadowDepth: CGFloat = 5
+
     var body: some View {
         ZStack(alignment: .topLeading) {
             ForEach(Array(rects.enumerated()), id: \.offset) { _, rect in
                 let shape = RoundedRectangle(cornerRadius: radius(for: rect), style: .continuous)
-                shape
-                    .fill(style.fillStyle)
-                    .overlay(shape.strokeBorder(style.border ? style.borderColor.color : .clear,
-                                                lineWidth: style.borderWidth))
-                    .shadow(color: .black.opacity(style.shadow ? style.shadowOpacity : 0), radius: 6, y: 3)
-                    .frame(width: rect.width, height: rect.height)
-                    .offset(x: rect.minX, y: rect.minY)
+                ZStack(alignment: .topLeading) {
+                    // The tint sits over the whole bar, icons included, so it's kept
+                    // light; intensity is how much of the colour comes through.
+                    shape.fill(style.fillStyle).opacity(style.intensity)
+                    if style.border && style.shape != .full {
+                        shape.strokeBorder(style.borderColor.color, lineWidth: style.borderWidth)
+                    }
+                }
+                .shadow(color: .black.opacity(style.shadow && style.shape != .full ? style.shadowOpacity : 0),
+                        radius: 4, y: 2)
+                .frame(width: rect.width, height: rect.height)
+                .offset(x: rect.minX, y: rect.minY)
+            }
+
+            if style.shape == .full {
+                if style.border {
+                    // A hairline along the bottom edge.
+                    Rectangle()
+                        .fill(style.borderColor.color)
+                        .frame(width: layout.size.width, height: style.borderWidth)
+                        .offset(y: layout.barHeight - style.borderWidth)
+                }
+                if style.shadow {
+                    LinearGradient(colors: [.black.opacity(style.shadowOpacity * 0.6), .clear],
+                                   startPoint: .top, endPoint: .bottom)
+                        .frame(width: layout.size.width, height: Self.shadowDepth)
+                        .offset(y: layout.barHeight)
+                }
             }
         }
         .frame(width: layout.size.width, height: layout.size.height, alignment: .topLeading)
