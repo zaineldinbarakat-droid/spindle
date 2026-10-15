@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import SwiftUI
 
 enum MenuBarSection: String, CaseIterable, Identifiable {
     case visible, hidden, alwaysHidden
@@ -136,6 +137,7 @@ final class SectionManager: ObservableObject {
     var alwaysDividerFrame: CGRect? { alwaysDividerItem.button?.window?.frame }
 
     func section(of item: MenuBarItem) -> MenuBarSection {
+        if item.isOverflowed { return .visible }
         guard let divider = dividerFrame, let always = alwaysDividerFrame else { return .visible }
         let x = item.frame.midX
         if x > divider.maxX - 1 { return .visible }
@@ -338,11 +340,32 @@ final class SectionManager: ObservableObject {
             toggleAll()
             return
         }
+        // Nothing to show yet: explain how to hide something instead of doing nothing.
+        if state == .collapsed && isAccessibilityTrusted
+            && items(in: .hidden).isEmpty && items(in: .alwaysHidden).isEmpty {
+            showHowToHide()
+            return
+        }
         if settings.useSleeveBar {
             onToggleClickedForBar?()
         } else {
             toggle()
         }
+    }
+
+    private var hintPopover: NSPopover?
+
+    private func showHowToHide() {
+        guard let button = toggleItem.button else { return }
+        if hintPopover?.isShown == true { hintPopover?.close(); return }
+        let popover = NSPopover()
+        popover.behavior = .transient
+        popover.contentViewController = NSHostingController(rootView: HowToHideView(close: { [weak self] in
+            self?.hintPopover?.close()
+        }))
+        hintPopover = popover
+        NSApp.activate(ignoringOtherApps: true)
+        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
     }
 
     private func updateIcons() {
@@ -359,13 +382,15 @@ final class SectionManager: ObservableObject {
         image?.isTemplate = true
         toggleItem.button?.image = image
 
-        // Dividers only show a faint tick while their section is open, so the user can
-        // see where to drop icons; collapsed, they're just a long invisible spacer.
+        // Dividers show a faint tick so the user can see where to drop icons. With the
+        // classic method a collapsed divider is a long invisible spacer instead; with
+        // cover hiding the ticks stay (anything behind them is under the cover anyway).
         let tick = NSImage(systemSymbolName: "poweron", accessibilityDescription: nil)?
             .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 9, weight: .light))
         tick?.isTemplate = true
-        dividerItem.button?.image = state == .collapsed ? nil : tick
-        alwaysDividerItem.button?.image = state == .all ? tick : nil
+        let alwaysShowTicks = Self.usesCoverHiding
+        dividerItem.button?.image = (alwaysShowTicks || state != .collapsed) ? tick : nil
+        alwaysDividerItem.button?.image = (alwaysShowTicks || state == .all) ? tick : nil
         dividerItem.button?.alphaValue = 0.35
         alwaysDividerItem.button?.alphaValue = 0.35
     }

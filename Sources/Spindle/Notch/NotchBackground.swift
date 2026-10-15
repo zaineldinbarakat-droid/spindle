@@ -38,17 +38,19 @@ struct NotchBackground: View {
 
         case .songColor:
             // Deep enough that white text stays legible on any cover, saturated enough
-            // that it's unmistakably the song's colour. The top edge stays darker so the
-            // shape still melts into the black hardware notch.
+            // that it's unmistakably the song's colour. Expanded, the top edge stays
+            // darker so the panel still melts into the black hardware notch. Collapsed,
+            // the pill is only as tall as the menu bar, so it takes the colour evenly —
+            // otherwise the tint is too thin to notice.
             shape.fill(
-                LinearGradient(colors: [player.accent.darkened(0.82),
-                                        player.accent.darkened(0.58),
-                                        player.accent.darkened(0.66)],
+                LinearGradient(colors: isExpanded
+                                ? [player.accent.darkened(0.74), player.accent.darkened(0.48), player.accent.darkened(0.58)]
+                                : [player.accent.darkened(0.5), player.accent.darkened(0.42)],
                                startPoint: .top, endPoint: .bottom)
             )
             .overlay(
                 shape.fill(
-                    RadialGradient(colors: [player.accent.opacity(isExpanded ? 0.28 : 0.12), .clear],
+                    RadialGradient(colors: [player.accent.opacity(isExpanded ? 0.32 : 0.18), .clear],
                                    center: .init(x: 0.2, y: 0.65),
                                    startRadius: 4,
                                    endRadius: 300)

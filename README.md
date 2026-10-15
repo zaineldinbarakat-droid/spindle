@@ -36,8 +36,9 @@ Built and verified against a MacBook Pro `Mac17,2` on macOS 27.0.
 - **Turntable wallpaper.** A full-screen retro scene (walnut deck, blurred cover-art
   room, film grain, big serif type) drawn behind your desktop icons. Off by default;
   *Desktop Wallpaper → My Wallpaper* puts yours back.
-- **Notch look.** *Black* blends into the hardware notch, *Song Color* washes the notch
-  in a deep tint of the current cover (cross-fading when the song changes), and
+- **Notch look.** *Song Color* (the default) washes the notch in a deep tint of the
+  cover's dominant colour, cross-fading when the song changes; *Black* blends into the
+  hardware notch; and
   *Liquid Glass* uses macOS 26's glass material tinted with the cover.
 - **Vinyl or cover.** *Show Song As* switches between the spinning record and the plain
   album cover, in the notch, the widgets and full screen.
@@ -53,8 +54,9 @@ Ice/Bartender, built to sit next to Spindle without the two ever fighting over t
 of the screen.
 
 - **Three sections.** Visible, Hidden and Always Hidden, separated by Sleeve's toggle and
-  two dividers. ⌘-drag icons across the dividers, or drag them between the columns in
-  *Settings → Layout* and Sleeve performs the ⌘-drag for you.
+  two faint │ dividers. ⌘-drag icons across the dividers. On macOS 14–26 you can also
+  drag them between the columns in *Settings → Layout* and Sleeve performs the ⌘-drag
+  for you; macOS 27 ignores synthesized ⌘-drags, so there it's done by hand.
 - **Reveal** by clicking the toggle (⌥-click for Always Hidden too), hovering or clicking
   an empty stretch of the bar, scrolling/swiping on the bar, or a hotkey.
 - **Auto-rehide** when the cursor leaves the menu bar (never while a menu is open), after
@@ -88,7 +90,12 @@ their space in the bar but are out of sight and can't be clicked by accident. On
 Items" button is always left alone.
 
 Known limits on 27: a dynamic or aerial wallpaper may not match the cover exactly (Sleeve
-falls back to a blur), and hidden icons still take up width.
+falls back to a blur), and hidden icons still take up width. Icons macOS itself has
+moved into its overflow (when the bar is full) are left to macOS.
+
+macOS 27 does have a native way to truly remove icons from the bar — the private
+`MenuBarClientCore` restriction behind exam mode, which Hidden Bar uses. Sleeve doesn't
+use it yet: it is a private API that a macOS update could break, and it hides per app.
 
 ### Working with Spindle
 
@@ -97,6 +104,12 @@ the strip it occupies around the notch; Sleeve keeps its hover zone, styling and
 Bar out of it. Only one dropdown is open at a time, and Zen mode hides Spindle too.
 
 ### Permissions
+
+Both apps are signed with a requirement pinned to their bundle identifier rather than
+the per-build hash, so a permission granted once keeps working after a rebuild. If an
+older build's entry is still listed in Privacy & Security → Accessibility, remove it
+(−) and grant again once.
+
 
 Sleeve needs **Accessibility** (to see, click and rearrange icons). Wi-Fi rules need
 **Location** (macOS hides network names otherwise) and Focus rules need **Full Disk

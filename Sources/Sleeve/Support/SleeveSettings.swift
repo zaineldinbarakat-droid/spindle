@@ -93,9 +93,11 @@ final class SleeveSettings: ObservableObject {
         revealOnEmptyClick = bool("revealOnEmptyClick", false)
         rehideMode = RehideMode(rawValue: d.string(forKey: "rehideMode") ?? "") ?? .smart
         rehideDelay = d.object(forKey: "rehideDelay") == nil ? 8 : d.double(forKey: "rehideDelay")
-        // Default on for notched Macs, where in-place reveal can put items under the camera.
+        // Default on for notched Macs, where in-place reveal can push items under the
+        // camera — except on macOS 27, where hidden icons never move (they're covered,
+        // not pushed), so revealing them in place is always safe.
         let hasNotch = NSScreen.screens.contains { $0.safeAreaInsets.top > 0 }
-        useSleeveBar = bool("useSleeveBar", hasNotch)
+        useSleeveBar = bool("useSleeveBar", hasNotch && !SectionManager.usesCoverHiding)
         avoidSpindle = bool("avoidSpindle", true)
         zenHidesSpindle = bool("zenHidesSpindle", true)
 

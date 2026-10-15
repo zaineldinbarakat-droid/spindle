@@ -51,7 +51,7 @@ final class NotchViewModel: ObservableObject {
     @Published var tab: Tab = .player
     /// Set while Sleeve's Zen mode is on: the whole notch UI steps out of the way.
     @Published var isZenHidden = false
-    @Published var style: Style = Style(rawValue: Defaults.string(.notchStyle) ?? "") ?? .black {
+    @Published var style: Style = Style(rawValue: Defaults.string(.notchStyle) ?? "") ?? .songColor {
         didSet { Defaults.set(.notchStyle, style.rawValue) }
     }
 

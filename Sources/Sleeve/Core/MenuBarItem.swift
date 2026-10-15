@@ -17,9 +17,13 @@ struct MenuBarItem: Identifiable, Equatable {
     /// Global frame, AppKit coordinates (origin bottom-left of the primary screen).
     var frame: CGRect
     var element: AXUIElement
+    /// macOS 27 moved this icon into its own "Show Hidden Menu Bar Items" overflow
+    /// because the bar ran out of room. It isn't really in the bar, so Sleeve
+    /// neither sorts it into a section nor covers anything on its behalf.
+    var isOverflowed = false
 
     static func == (lhs: MenuBarItem, rhs: MenuBarItem) -> Bool {
-        lhs.id == rhs.id && lhs.frame == rhs.frame && lhs.label == rhs.label
+        lhs.id == rhs.id && lhs.frame == rhs.frame && lhs.label == rhs.label && lhs.isOverflowed == rhs.isOverflowed
     }
 
     /// Name shown in Sleeve's UI. System items from MenuBarAgent/Control Center have
@@ -75,6 +79,7 @@ enum MenuBarScanner {
         guard AXIsProcessTrusted() else { return [] }
         let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
         var items: [MenuBarItem] = []
+        var overflowButton: CGRect?
 
         for app in NSWorkspace.shared.runningApplications where app.processIdentifier != ownPID {
             let appElement = AXUIElementCreateApplication(app.processIdentifier)
@@ -93,7 +98,11 @@ enum MenuBarScanner {
                 // macOS 27's own "Show Hidden Menu Bar Items" chevron: the only button
                 // MenuBarAgent puts in the bar. It must never be hidden or covered,
                 // or icons macOS overflowed would become unreachable.
-                if app.bundleIdentifier == "com.apple.MenuBarAgent" && role == kAXButtonRole { continue }
+                if app.bundleIdentifier == "com.apple.MenuBarAgent" && role == kAXButtonRole {
+                    overflowButton = CGRect(x: position.x, y: primaryHeight - position.y - size.height,
+                                            width: size.width, height: size.height)
+                    continue
+                }
 
                 // System items on macOS 27 are a group wrapping the real menu bar item,
                 // which carries the name, a stable identifier, and the press action.
@@ -127,6 +136,14 @@ enum MenuBarScanner {
                                          label: label,
                                          frame: frame,
                                          element: target))
+            }
+        }
+        // Overflowed icons report a position on top of macOS's overflow button.
+        if let overflowButton {
+            let zone = overflowButton.insetBy(dx: -30, dy: 0)
+            for index in items.indices where zone.contains(CGPoint(x: items[index].frame.midX,
+                                                                    y: items[index].frame.midY)) {
+                items[index].isOverflowed = true
             }
         }
         // Right to left, the way the menu bar reads from the clock outwards.

@@ -87,18 +87,22 @@ private struct PermissionBanner: View {
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: "hand.raised.fill").foregroundStyle(.orange)
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text("Sleeve needs Accessibility access").font(.headline)
-                Text("It's how Sleeve sees, clicks and rearranges menu bar icons. Hiding still works without it.")
+                Text("It's how Sleeve sees which icons are where. If Sleeve is already listed and switched on but this message stays, an older build's entry is in the way: select Sleeve in the list, click −, then click Grant Access again.")
                     .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
-            Button("Grant Access…") {
-                let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
-                AXIsProcessTrustedWithOptions(options)
-                NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
+            VStack(alignment: .trailing, spacing: 6) {
+                Button("Grant Access…") {
+                    let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+                    AXIsProcessTrustedWithOptions(options)
+                    NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
+                }
+                Button("Restart Sleeve") { SleeveRelauncher.relaunch() }
+                    .help("Some macOS versions only notice a new grant after a restart")
             }
-            Button("Re-check") { sections.rescan() }
         }
         .padding(12)
         .background(Color.orange.opacity(0.12))
@@ -165,8 +169,19 @@ private struct LayoutTab: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Drag icons between sections. Sleeve moves the real icon for you (it ⌘-drags it, so you'll see the cursor jump for a moment). You can also ⌘-drag icons in the menu bar yourself.")
-                .font(.caption).foregroundStyle(.secondary)
+            if SectionManager.usesCoverHiding {
+                Label {
+                    Text("To move an icon, hold **⌘** and drag it in the menu bar itself: left of the first faint │ next to Sleeve's icon is **Hidden**, left of the second is **Always Hidden**. macOS 27 doesn't let apps move other apps' icons, so dragging here can't do it for you.")
+                } icon: {
+                    Image(systemName: "command")
+                }
+                .font(.callout)
+                .padding(10)
+                .background(RoundedRectangle(cornerRadius: 8).fill(Color.accentColor.opacity(0.1)))
+            } else {
+                Text("Drag icons between sections. Sleeve moves the real icon for you (it ⌘-drags it, so you'll see the cursor jump for a moment). You can also ⌘-drag icons in the menu bar yourself.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
 
             HStack(alignment: .top, spacing: 10) {
                 ForEach(MenuBarSection.allCases) { section in
@@ -213,6 +228,10 @@ private struct LayoutTab: View {
     private func move(_ id: String, to section: MenuBarSection) {
         guard let item = sections.items.first(where: { $0.id == id }),
               sections.section(of: item) != section else { return }
+        if SectionManager.usesCoverHiding {
+            error = "On macOS 27, ⌘-drag “\(item.displayName)” in the menu bar itself — apps can't move it for you."
+            return
+        }
         moving = id
         error = nil
         Task {
