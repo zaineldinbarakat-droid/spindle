@@ -19,6 +19,14 @@ struct SettingsView: View {
                 }
                 .pickerStyle(.segmented)
 
+                Picker("Notch look", selection: $notch.style) {
+                    ForEach(NotchViewModel.Style.allCases) { style in
+                        Text(style.title).tag(style)
+                            .disabled(style == .liquidGlass && !NotchViewModel.Style.isGlassAvailable)
+                    }
+                }
+                .pickerStyle(.segmented)
+
                 Picker("Desktop wallpaper", selection: Binding(
                     get: { desktop.isBackdropVisible },
                     set: { desktop.setBackdrop(visible: $0) }
@@ -71,6 +79,21 @@ struct SettingsView: View {
             }
 
             Section("Focus timer") {
+                Picker("Preset", selection: Binding(
+                    get: { timer.currentPreset?.name ?? "custom" },
+                    set: { name in
+                        if let preset = PomodoroTimer.Preset.all.first(where: { $0.name == name }) {
+                            timer.apply(preset)
+                        }
+                    }
+                )) {
+                    ForEach(PomodoroTimer.Preset.all) { preset in
+                        Text(preset.name).tag(preset.name)
+                    }
+                    if timer.currentPreset == nil {
+                        Text("Custom").tag("custom")
+                    }
+                }
                 Stepper("Focus: \(timer.focusMinutes) min", value: $timer.focusMinutes, in: 1...120)
                 Stepper("Short break: \(timer.shortBreakMinutes) min", value: $timer.shortBreakMinutes, in: 1...60)
                 Stepper("Long break: \(timer.longBreakMinutes) min", value: $timer.longBreakMinutes, in: 1...90)

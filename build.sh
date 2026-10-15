@@ -1,19 +1,17 @@
 #!/bin/bash
-# Builds Spindle and assembles a runnable .app bundle.
+# Builds Spindle and Sleeve and assembles runnable .app bundles.
 #
 # Requires Xcode (not just the Command Line Tools): SwiftUI's @State and friends are
 # macros in the macOS 26+ SDK, and libSwiftUIMacros.dylib ships only with Xcode.
 set -euo pipefail
 
 CONFIG="${1:-release}"
-APP_NAME="Spindle"
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 BUILD_DIR="$ROOT/build"
-APP="$BUILD_DIR/$APP_NAME.app"
 
 if ! xcodebuild -version >/dev/null 2>&1; then
     cat >&2 <<'MSG'
-error: Xcode is required to build Spindle.
+error: Xcode is required to build Spindle and Sleeve.
 
   SwiftUI property wrappers are macros in this SDK and the macro plugin
   (libSwiftUIMacros.dylib) is not part of the Command Line Tools.
@@ -27,33 +25,41 @@ fi
 
 echo "==> Building ($CONFIG)"
 swift build -c "$CONFIG" --package-path "$ROOT"
+BIN_DIR="$(swift build -c "$CONFIG" --package-path "$ROOT" --show-bin-path)"
 
-BIN="$(swift build -c "$CONFIG" --package-path "$ROOT" --show-bin-path)/$APP_NAME"
-if [[ ! -x "$BIN" ]]; then
-    echo "error: built binary not found at $BIN" >&2
-    exit 1
-fi
+# assemble NAME PLIST — copies the binary into NAME.app and signs it.
+assemble() {
+    local name="$1" plist="$2"
+    local app="$BUILD_DIR/$name.app"
+    local bin="$BIN_DIR/$name"
+    if [[ ! -x "$bin" ]]; then
+        echo "error: built binary not found at $bin" >&2
+        exit 1
+    fi
 
-echo "==> Assembling $APP_NAME.app"
-rm -rf "$APP"
-mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-cp "$BIN" "$APP/Contents/MacOS/$APP_NAME"
-cp "$ROOT/Packaging/Info.plist" "$APP/Contents/Info.plist"
-printf 'APPL????' > "$APP/Contents/PkgInfo"
+    echo "==> Assembling $name.app"
+    rm -rf "$app"
+    mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
+    cp "$bin" "$app/Contents/MacOS/$name"
+    cp "$plist" "$app/Contents/Info.plist"
+    printf 'APPL????' > "$app/Contents/PkgInfo"
 
-if [[ -f "$ROOT/Packaging/AppIcon.icns" ]]; then
-    cp "$ROOT/Packaging/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
-    /usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string AppIcon" "$APP/Contents/Info.plist" 2>/dev/null || true
-fi
+    if [[ -f "$ROOT/Packaging/$name.icns" ]]; then
+        cp "$ROOT/Packaging/$name.icns" "$app/Contents/Resources/AppIcon.icns"
+        /usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string AppIcon" "$app/Contents/Info.plist" 2>/dev/null || true
+    fi
 
-# Ad-hoc signature. Good enough to launch, but the code directory hash changes on every
-# build, so macOS re-asks for Automation permission each time you rebuild. Sign with a
-# real Developer ID certificate to make the grant stick across builds.
-echo "==> Signing (ad-hoc)"
-codesign --force --sign - --timestamp=none "$APP" >/dev/null 2>&1 || {
-    echo "warning: ad-hoc signing failed; the app will still run" >&2
+    # Ad-hoc signature. Good enough to launch, but the code directory hash changes on
+    # every build, so macOS re-asks for Automation (Spindle) and Accessibility (Sleeve)
+    # each time you rebuild. A real Developer ID certificate makes grants stick.
+    codesign --force --sign - --timestamp=none "$app" >/dev/null 2>&1 || {
+        echo "warning: ad-hoc signing failed for $name; the app will still run" >&2
+    }
+    echo "Built: $app"
 }
 
+assemble Spindle "$ROOT/Packaging/Info.plist"
+assemble Sleeve "$ROOT/Packaging/Sleeve-Info.plist"
+
 echo
-echo "Built: $APP"
-echo "Run:   open \"$APP\""
+echo "Run:   open \"$BUILD_DIR/Spindle.app\" \"$BUILD_DIR/Sleeve.app\""

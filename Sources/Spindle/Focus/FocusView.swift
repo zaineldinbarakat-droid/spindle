@@ -183,9 +183,39 @@ struct FocusControls: View {
             }
             .buttonStyle(.plain)
 
+            PresetMenu()
+
             IconButton(symbol: "forward.end.fill", help: "Skip to next phase") { timer.skip() }
             IconButton(symbol: "arrow.counterclockwise", help: "Reset") { timer.reset() }
         }
+    }
+}
+
+/// "25/5" or "50/10" at a glance; click to switch.
+private struct PresetMenu: View {
+    @EnvironmentObject private var timer: PomodoroTimer
+
+    var body: some View {
+        Menu {
+            ForEach(PomodoroTimer.Preset.all) { preset in
+                Button {
+                    timer.apply(preset)
+                } label: {
+                    Text(timer.currentPreset == preset ? "\u{2713} \(preset.name)" : preset.name)
+                }
+            }
+        } label: {
+            Text(timer.currentPreset.map { "\($0.focus)/\($0.shortBreak)" } ?? "Custom")
+                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .foregroundStyle(Theme.primaryText)
+                .padding(.horizontal, 10)
+                .frame(height: 30)
+                .background(Capsule().fill(Color.white.opacity(0.08)))
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Timer preset")
     }
 }
 

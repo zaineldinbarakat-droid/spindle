@@ -23,8 +23,9 @@ Built and verified against a MacBook Pro `Mac17,2` on macOS 27.0.
 - **Click to open the source app.** Click the record (in the notch, a widget or full
   screen), the track title, or the left side of the notch strip, and Spotify or Music
   comes to the front with its window showing.
-- **Focus timer.** The timer tab in the notch is a Pomodoro clock: 25/5 by default with
-  a long break every four sessions, all adjustable in Settings. While it runs, the
+- **Focus timer.** The timer tab in the notch is a Pomodoro clock with two presets —
+  *Classic* 25/5 (15-minute long break) and *Deep Work* 50/10 (30-minute long break) —
+  switchable from the timer tab, the menu or Settings, and every length adjustable. While it runs, the
   countdown sits in the collapsed notch. When a phase ends you get a chime and a
   notification, and the notch drops open briefly. It can also pause your music during
   breaks and start it again when focus begins.
@@ -35,12 +36,71 @@ Built and verified against a MacBook Pro `Mac17,2` on macOS 27.0.
 - **Turntable wallpaper.** A full-screen retro scene (walnut deck, blurred cover-art
   room, film grain, big serif type) drawn behind your desktop icons. Off by default;
   *Desktop Wallpaper → My Wallpaper* puts yours back.
+- **Notch look.** *Black* blends into the hardware notch, *Song Color* washes the notch
+  in a deep tint of the current cover (cross-fading when the song changes), and
+  *Liquid Glass* uses macOS 26's glass material tinted with the cover.
 - **Vinyl or cover.** *Show Song As* switches between the spinning record and the plain
   album cover, in the notch, the widgets and full screen.
 - **Full-screen turntable.** The same scene as an interactive full-screen space.
   Esc leaves it.
 
 Everything is in the menu-bar icon's menu and in Settings.
+
+## Sleeve — the menu bar manager
+
+Sleeve is a second, separate app in this repo: a free menu bar manager in the spirit of
+Ice/Bartender, built to sit next to Spindle without the two ever fighting over the top
+of the screen.
+
+- **Three sections.** Visible, Hidden and Always Hidden, separated by Sleeve's toggle and
+  two dividers. ⌘-drag icons across the dividers, or drag them between the columns in
+  *Settings → Layout* and Sleeve performs the ⌘-drag for you.
+- **Reveal** by clicking the toggle (⌥-click for Always Hidden too), hovering or clicking
+  an empty stretch of the bar, scrolling/swiping on the bar, or a hotkey.
+- **Auto-rehide** when the cursor leaves the menu bar (never while a menu is open), after
+  a delay, or never.
+- **Sleeve Bar.** A floating drawer under the menu bar that lists hidden icons, so on a
+  notched MacBook they can't end up behind the camera. Click one and its real menu opens.
+- **Styling.** Solid or gradient tints, Full / Rounded / Split-capsule shapes, shadows and
+  borders, with a separate Dark Mode style and per-display overrides.
+- **Spacing.** A slider for icon spacing (applied by restarting the apps that own icons).
+- **Search.** ⌃⌥⌘S opens a finder for every menu bar icon; Return opens its menu.
+- **Automation.** Keep a section open while the battery is low, a given Wi-Fi network is
+  connected, a Focus is on, or a script exits 0.
+- **Zen mode.** ⌃⌥⌘Z covers the whole menu bar on every display (and hides Spindle's
+  notch pill); double-click the bar or press the hotkey again to come back.
+
+Default hotkeys are ⌃⌥⌘ + H (hidden), A (all), S (search), Z (Zen), all rebindable.
+
+### How Sleeve hides icons on macOS 27
+
+Every menu bar manager before macOS 27 hid icons by stretching a divider to 10 000 pt so
+it pushed its neighbours off the screen. macOS 27 moved status item layout into a system
+process (MenuBarAgent) that caps item width: measured on this machine, an icon "behind" a
+10 000 pt divider moved 20 pt. The real layout lives in a protected container that third
+party apps can't write.
+
+So on macOS 27 Sleeve **covers** the hidden stretch instead: a strip just above the icons
+that paints what the empty bar would look like there — your wallpaper, cropped and scaled
+the way the desktop shows it, plus any Sleeve style — and reveals on click. The icons keep
+their space in the bar but are out of sight and can't be clicked by accident. On macOS
+14–26 Sleeve uses the classic push-off-screen method. macOS 27's own "Show Hidden Menu Bar
+Items" button is always left alone.
+
+Known limits on 27: a dynamic or aerial wallpaper may not match the cover exactly (Sleeve
+falls back to a blur), and hidden icons still take up width.
+
+### Working with Spindle
+
+The apps talk over distributed notifications (`Sources/SpindleSync`). Spindle publishes
+the strip it occupies around the notch; Sleeve keeps its hover zone, styling and Sleeve
+Bar out of it. Only one dropdown is open at a time, and Zen mode hides Spindle too.
+
+### Permissions
+
+Sleeve needs **Accessibility** (to see, click and rearrange icons). Wi-Fi rules need
+**Location** (macOS hides network names otherwise) and Focus rules need **Full Disk
+Access** (there is no public Focus API). Each is asked for only when a feature needs it.
 
 ## Requirements
 
@@ -58,7 +118,7 @@ After installing Xcode:
 ```bash
 sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
 ./build.sh
-open build/Spindle.app
+open build/Spindle.app build/Sleeve.app
 ```
 
 On first launch macOS asks permission to control Music and Spotify. That prompt is the
@@ -121,6 +181,14 @@ Sources/Spindle/
     VinylView           static grooves + rotating sheen, label, spindle
     TonearmView         arm, headshell, drag-to-scrub
   UI/                 shape, transport, progress, marquee, visualizer, settings
+
+Sources/SpindleSync/  shared by both apps: the notification channel
+
+Sources/Sleeve/
+  Core/               AX scanner, sections, cover hiding (macOS 27), item mover,
+                      reveal gestures, hotkeys, automation, spacing, Spindle bridge
+  Appearance/         style model and the overlay drawn behind the bar
+  UI/                 Sleeve Bar, search, Zen, settings
 ```
 
 Two details worth knowing before changing things:
@@ -151,10 +219,16 @@ Honest list, so nothing here is a surprise:
 - **A real spectrum analyser.** The collapsed-view visualizer is decorative motion from
   layered sine waves. Reading actual system audio needs a loopback device or an audio
   tap, which a passive widget has no business installing.
-- **An app icon.** Drop an `AppIcon.icns` into `Packaging/` and `build.sh` picks it up.
+- **App icons.** Drop `Spindle.icns` / `Sleeve.icns` into `Packaging/` and `build.sh`
+  picks them up.
+- **Sleeve per-Space and per-Focus styles.** macOS has no public API for the current
+  Space, and Focus filters need an App Intents extension that SwiftPM can't build.
+  Styles switch per light/dark mode and per display.
 
 ## Known rough edge
 
 `build.sh` signs ad-hoc. The code directory hash changes on every build, so macOS
-re-asks for Automation permission each time you rebuild. Signing with a real Developer ID
+re-asks for Automation (Spindle) and Accessibility (Sleeve) permission each time you
+rebuild — for Sleeve, remove the old entry in Privacy & Security → Accessibility and add
+the new build. Signing with a real Developer ID
 certificate makes the grant stick.
