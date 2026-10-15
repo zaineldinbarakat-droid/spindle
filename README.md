@@ -54,9 +54,12 @@ Ice/Bartender, built to sit next to Spindle without the two ever fighting over t
 of the screen.
 
 - **Hide all apps until hover (default).** Like Ice: the menu bar shows only Sleeve and
-  Apple's own icons; move the cursor to the right side of the bar and every app icon
-  comes back, move away and they tuck away again. Pick apps to always keep visible under
-  *Settings → Layout*.
+  Apple's own icons. Hover over Sleeve's icon (or the right side of the bar) and every
+  app icon comes back; move away and they tuck away again. Pick apps to always keep
+  visible under *Settings → Layout*.
+- **An icon with two faces.** 🫥 while your apps are tucked away, 👀 while you're looking
+  at them — or Ice's styles (eye, dot, ellipsis, chevron, door), a record, or your own
+  image, each with a hidden and a showing face.
 - **Three sections** (with hide-all off). Visible, Hidden and Always Hidden, separated by Sleeve's toggle and
   two faint │ dividers. ⌘-drag icons across the dividers. On macOS 14–26 you can also
   drag them between the columns in *Settings → Layout* and Sleeve performs the ⌘-drag
@@ -67,7 +70,8 @@ of the screen.
   a delay, or never.
 - **Sleeve Bar.** A floating drawer under the menu bar that lists hidden icons, so on a
   notched MacBook they can't end up behind the camera. Click one and its real menu opens.
-- **Styling.** Solid or gradient tints, Full / Rounded / Split-capsule shapes, shadows and
+- **Styling.** Solid tints or multi-stop gradients (add, drag and recolour stops, set
+  any angle; Sunset, Aurora, Ice and Neon presets), Full / Rounded / Split-capsule shapes, shadows and
   borders, with a separate Dark Mode style and per-display overrides.
 - **Spacing.** A slider for icon spacing (applied by restarting the apps that own icons).
 - **Search.** ⌃⌥⌘S opens a finder for every menu bar icon; Return opens its menu.
@@ -91,8 +95,10 @@ Sleeve hands MenuBarAgent an allow-list of apps and macOS removes every other ap
 and reflows the bar, so hidden icons really disappear and free their space. The bridge is
 a small Objective-C target (`Sources/MenuBarVisibility`) that resolves everything at
 runtime and catches exceptions, and Sleeve fails open: if the API is missing or errors,
-it releases any restriction and falls back to **covering** — painting the hidden stretch
-with your wallpaper. Limits: native hiding is per app, and Apple's own icons are always
+it releases any restriction and falls back to **covering** — a frosted capsule with a
+quiet "•••" over each hidden stretch; click it to reveal. (An earlier cover painted the
+wallpaper and froze Sleeve when the wallpaper lived in a protected folder; the cover now
+reads no files.) Limits: native hiding is per app, and Apple's own icons are always
 kept (Sleeve covers those when they're in a hidden section). Verified on macOS 27.0.1:
 the restriction is accepted, the bar reflows, and hover reveal/rehide cycle cleanly.
 
