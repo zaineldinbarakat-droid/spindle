@@ -153,6 +153,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
                 entry.title += " (macOS 26+)"
             }
         }
+        lookMenu.addItem(.separator())
+        add(to: lookMenu, "Album Color Reaches Into the Notch", #selector(toggleTintNotch))
+            .state = environment.notch.tintNotch ? .on : .off
         lookItem.submenu = lookMenu
         menu.addItem(lookItem)
 
@@ -214,6 +217,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         guard let name = sender.representedObject as? String,
               let preset = PomodoroTimer.Preset.all.first(where: { $0.name == name }) else { return }
         AppEnvironment.shared.timer.apply(preset)
+    }
+
+    @MainActor @objc private func toggleTintNotch() {
+        AppEnvironment.shared.notch.tintNotch.toggle()
     }
 
     @MainActor @objc private func setNotchStyle(_ sender: NSMenuItem) {

@@ -136,13 +136,11 @@ private struct GeneralTab: View {
             Section("Icon style") {
                 IconStylePicker()
                 Toggle("Reveal when hovering over Sleeve's icon", isOn: $settings.revealOnIconHover)
-                Toggle("Two-finger click shows or hides hidden apps", isOn: $settings.revealOnTwoFingerClick)
+                Toggle("Two-finger click the empty menu bar to show or hide apps", isOn: $settings.revealOnTwoFingerClick)
                 if !settings.hideAllApps {
                     Toggle("Show hidden icons in the Sleeve Bar (recommended on notched Macs)", isOn: $settings.useSleeveBar)
                 }
-                Text(settings.revealOnTwoFingerClick
-                     ? "Two-finger click Sleeve's icon or an empty part of the menu bar to show or hide · ⌃-click the icon for the menu. Tip: ⌘-drag Sleeve's icon next to the clock, so revealed apps appear to its left and it stays put under your cursor."
-                     : "Click the icon to reveal · ⌥-click shows Always Hidden too · right-click for the menu. Tip: ⌘-drag Sleeve's icon next to the clock, so revealed apps appear to its left and it stays put under your cursor.")
+                Text("Hover or click Sleeve's icon to show your apps · two-finger click it for options (Zen mode, search, menu bar color…). Tip: ⌘-drag Sleeve's icon next to the clock, so revealed apps appear to its left and it stays put under your cursor.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             if SectionManager.isModernMenuBar {

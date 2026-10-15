@@ -687,18 +687,9 @@ final class SectionManager: ObservableObject {
 
     @objc private func toggleClicked(_ sender: NSStatusBarButton) {
         let event = NSApp.currentEvent
-        // Two-finger click (a secondary click) shows or hides; the menu is on ⌃-click.
-        if event?.type == .rightMouseUp && settings.revealOnTwoFingerClick
-            && event?.modifierFlags.contains(.control) != true {
-            toggleForUser()
-            return
-        }
+        // Two-finger click (secondary click) or ⌃-click: Sleeve's menu of options.
         if event?.type == .rightMouseUp || event?.modifierFlags.contains(.control) == true {
-            if let menu = menuProvider?() {
-                toggleItem.menu = menu
-                toggleItem.button?.performClick(nil)
-                toggleItem.menu = nil
-            }
+            showMenu()
             return
         }
         if event?.modifierFlags.contains(.option) == true {
@@ -763,6 +754,19 @@ final class SectionManager: ObservableObject {
         updateIcons()
         // Hiding again is left to auto-rehide, which waits until the cursor has left
         // the whole menu bar — revealed icons can shift the bar under the cursor.
+    }
+
+    private var lastMenuShown = Date.distantPast
+
+    /// Sleeve's options, dropped down from its icon. One click can arrive twice on
+    /// macOS 27 (global monitor and button), so a second request within 0.4 s is the
+    /// same click.
+    func showMenu() {
+        guard Date.now.timeIntervalSince(lastMenuShown) > 0.4, let menu = menuProvider?() else { return }
+        lastMenuShown = .now
+        toggleItem.menu = menu
+        toggleItem.button?.performClick(nil)
+        toggleItem.menu = nil
     }
 
     private var hintPopover: NSPopover?

@@ -14,8 +14,16 @@ struct NotchBackground: View {
 
     var body: some View {
         fill
-            .compositingGroup()
-            .shadow(color: .black.opacity(isExpanded ? 0.4 : 0), radius: 14, y: 7)
+            // Shadow only *below* the panel: one cast all round also darkened the
+            // menu bar beside the notch, a halo that read as a bump as it opened.
+            .background(alignment: .bottom) {
+                RoundedRectangle(cornerRadius: Theme.outerCornerRadius, style: .continuous)
+                    .fill(Color.black.opacity(isExpanded ? 0.45 : 0))
+                    .frame(height: 36)
+                    .padding(.horizontal, 26)
+                    .blur(radius: 16)
+                    .offset(y: 12)
+            }
             // A new cover cross-fades the colour rather than cutting.
             .animation(.easeInOut(duration: 0.9), value: player.accent)
     }
@@ -37,10 +45,25 @@ struct NotchBackground: View {
                     .mask(belowNotchMask)
                 )
 
+        case .songColor where viewModel.tintNotch:
+            // Opted in: the colour reaches right up into the notch.
+            shape.fill(
+                LinearGradient(colors: isExpanded
+                                ? [player.accent.darkened(0.74), player.accent.darkened(0.48), player.accent.darkened(0.58)]
+                                : [player.accent.darkened(0.5), player.accent.darkened(0.42)],
+                               startPoint: .top, endPoint: .bottom)
+            )
+            .overlay(
+                shape.fill(
+                    RadialGradient(colors: [player.accent.opacity(isExpanded ? 0.32 : 0.18), .clear],
+                                   center: .init(x: 0.2, y: 0.65), startRadius: 4, endRadius: 300)
+                )
+            )
+
         case .songColor:
-            // The colour never touches the notch: the collapsed pill and the strip
-            // beside the camera stay pure black like the hardware, and the cover's
-            // colour rises in from below that strip.
+            // The default: the colour never touches the notch. The collapsed pill and
+            // the strip beside the camera stay pure black like the hardware, and the
+            // cover's colour rises in from below that strip.
             if isExpanded {
                 shape.fill(
                     LinearGradient(stops: [

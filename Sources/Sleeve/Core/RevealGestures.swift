@@ -64,8 +64,16 @@ final class RevealGestures {
         }
         let start = appMenusEnd + 8
         // Hide-all (Ice-style): the whole right side of the bar is the trigger —
-        // what's left there is just Sleeve and Apple's own icons.
-        if settings.hideAllApps { return point.x > start }
+        // what's left there is just Sleeve and Apple's own icons. It doesn't depend on
+        // where the active app's menus end: some apps report menus far beyond their
+        // real extent (or spill past the notch), which shrank the zone to nothing and
+        // made hover dead whenever such an app was in front.
+        if settings.hideAllApps {
+            if let right = screen.auxiliaryTopRightArea, screen.safeAreaInsets.top > 0 {
+                return point.x > right.minX + 4
+            }
+            return point.x > screen.frame.midX
+        }
         let end = (sections.leftmostVisibleX ?? screen.frame.maxX) - 8
         return point.x > start && point.x < end
     }
@@ -110,8 +118,12 @@ final class RevealGestures {
         guard settings.revealOnTwoFingerClick else { return }
         let point = NSEvent.mouseLocation
         // On macOS 27 a secondary click on Sleeve's own icon arrives here too (the
-        // button often never sees it), so it's handled here; the button's own path is
-        // de-duplicated in `toggleForUser`.
+        // button often never sees it). On the icon it opens Sleeve's menu; anywhere
+        // else on the empty bar it shows or hides.
+        if let icon = sections.toggleFrame, icon.insetBy(dx: -2, dy: -6).contains(point) {
+            sections.showMenu()
+            return
+        }
         guard isInBar(point), !isOverAnyIcon(point), point.x > appMenusEnd + 8 else { return }
         if let screen = NSScreen.screens.first, let l = screen.auxiliaryTopLeftArea,
            let r = screen.auxiliaryTopRightArea, screen.safeAreaInsets.top > 0,

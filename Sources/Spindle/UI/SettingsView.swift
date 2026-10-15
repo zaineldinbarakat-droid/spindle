@@ -27,6 +27,14 @@ struct SettingsView: View {
                     }
                 }
                 .pickerStyle(.segmented)
+                if notch.style == .songColor {
+                    Toggle("Let the album color reach into the notch", isOn: $notch.tintNotch)
+                }
+                Picker("Collapsed notch shows", selection: $notch.collapsedShowsCover) {
+                    Text("Album Cover").tag(true)
+                    Text("Spinning Record").tag(false)
+                }
+                .pickerStyle(.segmented)
 
                 Picker("Desktop wallpaper", selection: Binding(
                     get: { desktop.isBackdropVisible },
@@ -40,7 +48,7 @@ struct SettingsView: View {
 
             Section("Behaviour") {
                 Toggle("Open when the cursor reaches the notch", isOn: $notch.openOnHover)
-                Toggle("Show visualizer in the collapsed view", isOn: $notch.showVisualizer)
+                Toggle("Show the glowing playing indicator in the collapsed notch", isOn: $notch.showVisualizer)
                 Toggle("Launch at login", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, enabled in
                         // Re-read: registration can fail (e.g. quarantined app).

@@ -115,9 +115,16 @@ final class SleeveAppDelegate: NSObject, NSApplicationDelegate {
             return item
         }
 
-        _ = add(env.sections.state == .collapsed ? "Show Hidden Icons" : "Hide Icons") { env.sections.toggle() }
-        _ = add(env.sections.state == .all ? "Hide Always Hidden Icons" : "Show All Icons") { env.sections.toggleAll() }
+        _ = add(env.sections.state == .collapsed ? "Show Hidden Apps" : "Hide Apps") { env.sections.toggleForUser() }
+        if !env.settings.hideAllApps {
+            _ = add(env.sections.state == .all ? "Hide Always Hidden Apps" : "Show Everything") { env.sections.toggleAll() }
+        }
         _ = add("Search Menu Bar…") { env.search.open() }
+        menu.addItem(.separator())
+        let hideAll = add("Hide All Apps Until Hover") { env.settings.hideAllApps.toggle() }
+        hideAll.state = env.settings.hideAllApps ? .on : .off
+        let hover = add("Show on Hover") { env.settings.revealOnHover.toggle() }
+        hover.state = env.settings.revealOnHover ? .on : .off
         menu.addItem(.separator())
         let zen = add("Zen Mode") { env.zen.toggle() }
         zen.state = env.zen.isOn ? .on : .off
