@@ -107,6 +107,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         add(to: focusMenu, "Skip to Next Phase", #selector(skipPhase))
         add(to: focusMenu, "Reset", #selector(resetTimer))
         focusMenu.addItem(.separator())
+        for preset in PomodoroTimer.Preset.all {
+            let entry = add(to: focusMenu, preset.name, #selector(applyPreset(_:)))
+            entry.representedObject = preset.name
+            entry.state = timer.currentPreset == preset ? .on : .off
+        }
+        focusMenu.addItem(.separator())
         add(to: focusMenu, "Show in Notch", #selector(showFocusTab))
         focusItem.submenu = focusMenu
         menu.addItem(focusItem)
@@ -133,6 +139,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         }
         styleItem.submenu = styleMenu
         menu.addItem(styleItem)
+
+        let lookItem = NSMenuItem(title: "Notch Look", action: nil, keyEquivalent: "")
+        let lookMenu = NSMenu()
+        for style in NotchViewModel.Style.allCases {
+            let entry = add(to: lookMenu, style.title, #selector(setNotchStyle(_:)))
+            entry.representedObject = style.rawValue
+            entry.state = environment.notch.style == style ? .on : .off
+            if style == .liquidGlass && !NotchViewModel.Style.isGlassAvailable {
+                entry.action = nil
+                entry.title += " (macOS 26+)"
+            }
+        }
+        lookItem.submenu = lookMenu
+        menu.addItem(lookItem)
 
         let wallpaperItem = NSMenuItem(title: "Desktop Wallpaper", action: nil, keyEquivalent: "")
         let wallpaperMenu = NSMenu()
@@ -185,6 +205,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         guard let raw = sender.representedObject as? String,
               let kind = DesktopWidgetKind(rawValue: raw) else { return }
         AppEnvironment.shared.desktop.toggleWidget(kind)
+    }
+
+    @MainActor @objc private func applyPreset(_ sender: NSMenuItem) {
+        guard let name = sender.representedObject as? String,
+              let preset = PomodoroTimer.Preset.all.first(where: { $0.name == name }) else { return }
+        AppEnvironment.shared.timer.apply(preset)
+    }
+
+    @MainActor @objc private func setNotchStyle(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String,
+              let style = NotchViewModel.Style(rawValue: raw) else { return }
+        AppEnvironment.shared.notch.style = style
     }
 
     @MainActor @objc private func useOwnWallpaper() {

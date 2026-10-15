@@ -17,13 +17,14 @@ struct NotchRootView: View {
             // click-through everywhere the panel isn't actually drawn.
             Color.clear
 
-            if viewModel.isExpanded || player.snapshot.hasTrack || timer.isActive {
+            if !viewModel.isZenHidden && (viewModel.isExpanded || player.snapshot.hasTrack || timer.isActive) {
                 island
                     .transition(.opacity)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .environment(\.colorScheme, .dark)
+        .animation(.easeInOut(duration: 0.25), value: viewModel.isZenHidden)
     }
 
     private var collapsedSize: CGSize {
@@ -42,18 +43,7 @@ struct NotchRootView: View {
                                bottomRadius: expanded ? Theme.outerCornerRadius : Theme.notchCornerRadius)
 
         return ZStack(alignment: .top) {
-            shape
-                .fill(Theme.panel)
-                .overlay(
-                    // Cover art bleeding a faint glow into the panel.
-                    shape.fill(
-                        RadialGradient(colors: [player.accent.opacity(expanded ? 0.18 : 0), .clear],
-                                       center: .init(x: 0.2, y: 0.6),
-                                       startRadius: 10,
-                                       endRadius: 280)
-                    )
-                )
-                .shadow(color: .black.opacity(expanded ? 0.45 : 0), radius: 16, y: 8)
+            NotchBackground(shape: shape, isExpanded: expanded)
 
             ZStack(alignment: .top) {
                 if expanded {

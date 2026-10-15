@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import Combine
+import SpindleSync
 
 /// Keeps one `NotchPanel` alive on the notch screen and decides when it opens.
 ///
@@ -54,6 +55,60 @@ final class NotchWindowController {
                 self?.panel?.ignoresMouseEvents = (state == .collapsed)
             }
             .store(in: &cancellables)
+
+        installSync()
+    }
+
+    // MARK: - Sleeve sync
+
+    private var syncObservers: [NSObjectProtocol] = []
+
+    private func installSync() {
+        syncObservers.append(SyncChannel.observe(SyncChannel.requestSpindleState) { [weak self] _ in
+            Task { @MainActor in self?.publishState() }
+        })
+        syncObservers.append(SyncChannel.observe(SyncChannel.zenMode) { [weak self] info in
+            Task { @MainActor in self?.setZen(info["enabled"] as? Bool ?? false) }
+        })
+        syncObservers.append(SyncChannel.observe(SyncChannel.sleeveTerminated) { [weak self] _ in
+            Task { @MainActor in self?.setZen(false) }
+        })
+        // One dropdown at a time: Sleeve's bar opening closes our panel.
+        syncObservers.append(SyncChannel.observe(SyncChannel.sleeveBar) { [weak self] info in
+            Task { @MainActor in
+                guard let self, info["open"] as? Bool == true else { return }
+                self.closeWorkItem?.cancel()
+                self.closeWorkItem = nil
+                self.viewModel.collapse()
+            }
+        })
+
+        // Anything that changes what we occupy is worth telling Sleeve about.
+        Publishers.CombineLatest3(viewModel.statePublisher.removeDuplicates(),
+                                  viewModel.metricsPublisher.removeDuplicates(),
+                                  viewModel.$isZenHidden.removeDuplicates())
+            .debounce(for: .milliseconds(50), scheduler: RunLoop.main)
+            .sink { [weak self] _ in self?.publishState() }
+            .store(in: &cancellables)
+        player.$snapshot.map(\.hasTrack).removeDuplicates()
+            .merge(with: timer.runningPublisher.removeDuplicates())
+            .sink { [weak self] _ in self?.publishState() }
+            .store(in: &cancellables)
+    }
+
+    private func setZen(_ enabled: Bool) {
+        if enabled { viewModel.collapse() }
+        viewModel.isZenHidden = enabled
+    }
+
+    private func publishState() {
+        let metrics = viewModel.metrics
+        let pillVisible = !viewModel.isZenHidden && (player.snapshot.hasTrack || timer.isActive || viewModel.isExpanded)
+        let state = SpindleState(pillFrame: pillVisible ? metrics.hoverZone() : .zero,
+                                 hoverZone: viewModel.openOnHover ? metrics.hoverZone() : .zero,
+                                 isExpanded: viewModel.isExpanded,
+                                 isZenHidden: viewModel.isZenHidden)
+        SyncChannel.post(SyncChannel.spindleState, state.userInfo)
     }
 
     private func rebuildPanel() {
@@ -67,6 +122,8 @@ final class NotchWindowController {
                 .environmentObject(player)
                 .environmentObject(timer)
             let hosting = NSHostingView(rootView: root)
+            // Layer-backed so the morph animates on the GPU compositor.
+            hosting.wantsLayer = true
             hosting.frame = CGRect(origin: .zero, size: metrics.windowFrame().size)
             created.contentView = hosting
             created.ignoresMouseEvents = true
@@ -147,7 +204,7 @@ final class NotchWindowController {
     }
 
     private func handleMouseMoved() {
-        guard viewModel.openOnHover else { return }
+        guard viewModel.openOnHover, !viewModel.isZenHidden else { return }
         let location = NSEvent.mouseLocation
         let metrics = viewModel.metrics
 
@@ -189,6 +246,8 @@ final class NotchWindowController {
         globalMouseMonitor = nil
         localMouseMonitor = nil
         cancellables.removeAll()
+        syncObservers.forEach { DistributedNotificationCenter.default().removeObserver($0) }
+        syncObservers.removeAll()
         panel?.orderOut(nil)
         panel = nil
     }

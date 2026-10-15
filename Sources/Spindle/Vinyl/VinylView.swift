@@ -21,7 +21,9 @@ struct VinylView: View {
         GeometryReader { geo in
             let size = min(geo.size.width, geo.size.height)
 
-            TimelineView(.animation(minimumInterval: 1.0 / 90.0, paused: !isSpinning)) { timeline in
+            // No minimum interval: frames follow the display (120 Hz on ProMotion).
+            // A fixed 90 fps on a 120 Hz panel lands unevenly and the record judders.
+            TimelineView(.animation(minimumInterval: nil, paused: !isSpinning)) { timeline in
                 ZStack {
                     staticDisc(size: size)
                     rotatingDisc(size: size)

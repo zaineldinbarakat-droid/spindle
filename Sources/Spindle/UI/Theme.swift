@@ -48,9 +48,13 @@ extension AnyTransition {
 }
 
 extension Animation {
-    /// Used for the open/close of the panel. Critically damped-ish: the shape grows out
-    /// of the notch and settles without a wobble, so it feels attached to the hardware.
-    static var notch: Animation { .spring(response: 0.42, dampingFraction: 0.86) }
+    /// Opening: the shape grows out of the notch and settles without a wobble, so it
+    /// feels attached to the hardware. `.smooth` is a spring with no bounce whose
+    /// velocity carries over if it's interrupted mid-flight, so a quick in-and-out of
+    /// the cursor never snaps.
+    static var notch: Animation { .smooth(duration: 0.42) }
+    /// Closing is a touch quicker than opening; things should get out of the way fast.
+    static var notchClose: Animation { .smooth(duration: 0.32) }
     static var notchQuick: Animation { .spring(response: 0.22, dampingFraction: 0.9) }
 }
 

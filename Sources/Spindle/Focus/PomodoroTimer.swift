@@ -45,6 +45,7 @@ final class PomodoroTimer: ObservableObject {
 
     @Published private(set) var phase: Phase = .focus
     @Published private(set) var isRunning = false
+    var runningPublisher: AnyPublisher<Bool, Never> { $isRunning.eraseToAnyPublisher() }
     /// Seconds left in the current phase.
     @Published private(set) var remaining: TimeInterval
     /// Focus sessions finished since the last reset; drives the long-break cadence.
@@ -74,6 +75,38 @@ final class PomodoroTimer: ObservableObject {
     }
     @Published var peekNotchOnPhaseEnd: Bool = Defaults.bool(.peekNotchOnPhaseEnd, default: true) {
         didSet { Defaults.set(.peekNotchOnPhaseEnd, peekNotchOnPhaseEnd) }
+    }
+
+    // MARK: - Presets
+
+    struct Preset: Identifiable, Equatable {
+        var id: String { name }
+        var name: String
+        var focus: Int
+        var shortBreak: Int
+        var longBreak: Int
+
+        /// Francesco Cirillo's original timings.
+        static let classic = Preset(name: "Classic · 25 / 5", focus: 25, shortBreak: 5, longBreak: 15)
+        /// Longer blocks for deep work: fewer interruptions, a proper break each time.
+        static let deepWork = Preset(name: "Deep Work · 50 / 10", focus: 50, shortBreak: 10, longBreak: 30)
+
+        static let all = [classic, deepWork]
+    }
+
+    /// The preset the current durations match, or nil if they've been customised.
+    var currentPreset: Preset? {
+        Preset.all.first {
+            $0.focus == focusMinutes && $0.shortBreak == shortBreakMinutes && $0.longBreak == longBreakMinutes
+        }
+    }
+
+    /// Switches timings. A phase already counting keeps its clock; the new lengths
+    /// apply from the next phase (or immediately, if nothing has started yet).
+    func apply(_ preset: Preset) {
+        focusMinutes = preset.focus
+        shortBreakMinutes = preset.shortBreak
+        longBreakMinutes = preset.longBreak
     }
 
     /// Called after a phase ends, with the phase that is now current.
