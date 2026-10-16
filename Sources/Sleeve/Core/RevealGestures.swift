@@ -102,7 +102,7 @@ final class RevealGestures {
         // Hovering Sleeve's own icon. Checked here, from the global cursor stream,
         // because on macOS 27 the cursor over a status item is reported to the global
         // monitor while the button's own tracking area is unreliable.
-        let overIcon = sections.toggleFrame.map { $0.insetBy(dx: -1, dy: -6).contains(point) } ?? false
+        let overIcon = sections.iconFrame.map { $0.insetBy(dx: -1, dy: -6).contains(point) } ?? false
         if overIcon != sections.isHoveringIcon {
             overIcon ? sections.iconHoverBegan() : sections.iconHoverEnded()
         }
@@ -125,7 +125,7 @@ final class RevealGestures {
         // On macOS 27 a secondary click on Sleeve's own icon arrives here too (the
         // button often never sees it). Anywhere on the bar that isn't another app's
         // icon, it opens Sleeve's menu — "Show Hidden Apps" first.
-        if let icon = sections.toggleFrame, icon.insetBy(dx: -2, dy: -6).contains(point) {
+        if let icon = sections.iconFrame, icon.insetBy(dx: -2, dy: -6).contains(point) {
             sections.showMenu()
             return
         }

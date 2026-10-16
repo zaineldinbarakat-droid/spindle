@@ -155,6 +155,12 @@ final class SectionManager: ObservableObject {
         }.store(in: &cancellables)
         // Sleeve's icon is always in the bar.
         toggleItem.isVisible = true
+        settings.$fixedIcon.sink { [weak self] _ in
+            DispatchQueue.main.async { self?.updateIconHome() }
+        }.store(in: &cancellables)
+        NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)
+            .sink { [weak self] _ in self?.fixedIcon?.place() }
+            .store(in: &cancellables)
         iconHover.onEnter = { [weak self] in self?.iconHoverBegan() }
         iconHover.onExit = { [weak self] in self?.iconHoverEnded() }
         // Changing how or what to hide re-applies the current state the new way.
@@ -772,7 +778,12 @@ final class SectionManager: ObservableObject {
             showMenu()
             return
         }
-        if event?.modifierFlags.contains(.option) == true {
+        handlePrimaryClick(event?.modifierFlags ?? [])
+    }
+
+    /// A plain click on Sleeve's icon (status item or fixed).
+    func handlePrimaryClick(_ modifiers: NSEvent.ModifierFlags) {
+        if modifiers.contains(.option) {
             toggleAll()
             return
         }
@@ -846,6 +857,10 @@ final class SectionManager: ObservableObject {
     func showMenu() {
         guard Date.now.timeIntervalSince(lastMenuShown) > 0.4, let menu = menuProvider?() else { return }
         lastMenuShown = .now
+        if let host = fixedIcon?.host {
+            menu.popUp(positioning: nil, at: NSPoint(x: 0, y: -4), in: host)
+            return
+        }
         toggleItem.menu = menu
         toggleItem.button?.performClick(nil)
         toggleItem.menu = nil
@@ -861,7 +876,8 @@ final class SectionManager: ObservableObject {
     /// synthesized ⌘-drags rejected), so the fix is one ⌘-drag by the user; this
     /// explains that, once, the first time the situation is seen.
     var hasAppsRightOfIcon: Bool {
-        guard state != .collapsed, let icon = toggleFrame else { return false }
+        // A fixed icon can't be pushed around, so there's nothing to explain.
+        guard fixedIcon == nil, state != .collapsed, let icon = toggleFrame else { return false }
         return items.contains { item in
             isLive(item) && !item.isOverflowed && !item.isNativeSystemItem && !isOwn(item)
                 && item.frame.minX > icon.maxX
@@ -877,7 +893,7 @@ final class SectionManager: ObservableObject {
     }
 
     func showPlacementTip() {
-        guard let button = toggleItem.button else { return }
+        guard let button = iconAnchor else { return }
         let popover = NSPopover()
         popover.behavior = .transient
         popover.contentViewController = NSHostingController(rootView: PlacementTipView(close: { [weak self] in
@@ -888,7 +904,7 @@ final class SectionManager: ObservableObject {
     }
 
     private func showHowToHide() {
-        guard let button = toggleItem.button else { return }
+        guard let button = iconAnchor else { return }
         if hintPopover?.isShown == true { hintPopover?.close(); return }
         let popover = NSPopover()
         popover.behavior = .transient
@@ -903,6 +919,37 @@ final class SectionManager: ObservableObject {
     /// True while the cursor is over Sleeve's icon — the icon shows its "looking"
     /// face straight away, before anything has been revealed.
     private(set) var isHoveringIcon = false
+
+    // MARK: - Where the icon lives
+
+    private var fixedIcon: FixedIconController?
+
+    /// Where Sleeve's icon is on screen: its fixed spot, or the status item.
+    var iconFrame: CGRect? { fixedIcon?.frame ?? toggleFrame }
+
+    /// Moves the icon between its fixed window and the status item, per the setting.
+    private func updateIconHome() {
+        let wantsFixed = settings.fixedIcon && Self.isModernMenuBar
+        if wantsFixed, fixedIcon == nil {
+            let controller = FixedIconController(iconView: iconView)
+            controller.onEnter = { [weak self] in self?.iconHoverBegan() }
+            controller.onExit = { [weak self] in self?.iconHoverEnded() }
+            controller.onClick = { [weak self] in self?.handlePrimaryClick(NSEvent.modifierFlags) }
+            controller.onSecondaryClick = { [weak self] in self?.showMenu() }
+            fixedIcon = controller
+            // The status item stays (its bundle keeps Sleeve allow-listed) but takes
+            // no room, so nothing in the bar is pushed around on its account.
+            toggleItem.length = 0
+        } else if !wantsFixed, let controller = fixedIcon {
+            controller.show(false)
+            fixedIcon = nil
+            if let button = toggleItem.button { installIconView(in: button) }
+        }
+        updateIcons()
+    }
+
+    /// The view menus and tips hang from.
+    private var iconAnchor: NSView? { fixedIcon?.host ?? toggleItem.button }
 
     /// The icon is drawn by our own image view rather than the button's image, so the
     /// change between faces can animate: SF Symbols morph from one to the other, and

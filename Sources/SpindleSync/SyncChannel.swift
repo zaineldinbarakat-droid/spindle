@@ -56,14 +56,17 @@ public struct SpindleState: Equatable {
     public var panelFrame: CGRect
     public var isExpanded: Bool
     public var isZenHidden: Bool
+    /// The current song's colour (sRGB components), for Sleeve's "Album" menu bar tint.
+    public var accent: [Double]?
 
     public init(pillFrame: CGRect, hoverZone: CGRect, panelFrame: CGRect = .zero,
-                isExpanded: Bool, isZenHidden: Bool) {
+                isExpanded: Bool, isZenHidden: Bool, accent: [Double]? = nil) {
         self.pillFrame = pillFrame
         self.hoverZone = hoverZone
         self.panelFrame = panelFrame
         self.isExpanded = isExpanded
         self.isZenHidden = isZenHidden
+        self.accent = accent
     }
 
     public var userInfo: [String: Any] {
@@ -72,7 +75,8 @@ public struct SpindleState: Equatable {
             "hover": NSStringFromRect(hoverZone),
             "panel": NSStringFromRect(panelFrame),
             "expanded": isExpanded,
-            "zen": isZenHidden
+            "zen": isZenHidden,
+            "accent": accent ?? []
         ]
     }
 
@@ -84,5 +88,7 @@ public struct SpindleState: Equatable {
         panelFrame = (userInfo["panel"] as? String).map(NSRectFromString) ?? .zero
         isExpanded = userInfo["expanded"] as? Bool ?? false
         isZenHidden = userInfo["zen"] as? Bool ?? false
+        let components = userInfo["accent"] as? [Double] ?? []
+        accent = components.count == 3 ? components : nil
     }
 }

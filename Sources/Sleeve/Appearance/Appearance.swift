@@ -27,8 +27,17 @@ struct GradientStop: Codable, Equatable, Identifiable {
 struct MenuBarStyle: Codable, Equatable {
     enum Fill: String, Codable, CaseIterable, Identifiable {
         case none, solid, gradient
+        /// Follows the song playing in Spindle: a gradient made from the cover's colour.
+        case album
         var id: String { rawValue }
-        var title: String { rawValue.capitalized }
+        var title: String {
+            switch self {
+            case .none: return "Off"
+            case .solid: return "Solid"
+            case .gradient: return "Gradient"
+            case .album: return "Album"
+            }
+        }
     }
 
     enum Shape: String, Codable, CaseIterable, Identifiable {
@@ -88,6 +97,45 @@ struct MenuBarStyle: Codable, Equatable {
                               startPoint: points.start, endPoint: points.end)
     }
 
+    /// This style with "Album" turned into a concrete gradient from the song's colour
+    /// (a soft grey when nothing is playing).
+    func resolved(album: RGBA?) -> MenuBarStyle {
+        guard fill == .album else { return self }
+        let base = album ?? RGBA(r: 0.55, g: 0.55, b: 0.6)
+        func mix(_ c: RGBA, _ toward: Double, _ t: Double) -> RGBA {
+            RGBA(r: c.r + (toward - c.r) * t, g: c.g + (toward - c.g) * t, b: c.b + (toward - c.b) * t, a: 1)
+        }
+        var copy = self
+        copy.fill = .gradient
+        copy.gradientStops = [GradientStop(color: mix(base, 1, 0.25), location: 0),
+                              GradientStop(color: base, location: 0.5),
+                              GradientStop(color: mix(base, 0, 0.35), location: 1)]
+        return copy
+    }
+
+    /// A stand-in song colour for drawing the "Album" look as a swatch.
+    static let sampleAlbum = RGBA(r: 1, g: 0.5, b: 0.3)
+
+    /// Ready-made colour runs for the gradient editor.
+    static let palettes: [(String, [RGBA])] = [
+        ("Sunset", [RGBA(r: 1, g: 0.62, b: 0.2), RGBA(r: 0.98, g: 0.3, b: 0.4), RGBA(r: 0.55, g: 0.2, b: 0.85)]),
+        ("Ocean", [RGBA(r: 0.1, g: 0.85, b: 0.9), RGBA(r: 0.15, g: 0.45, b: 0.95), RGBA(r: 0.2, g: 0.15, b: 0.6)]),
+        ("Forest", [RGBA(r: 0.75, g: 0.9, b: 0.35), RGBA(r: 0.2, g: 0.65, b: 0.4), RGBA(r: 0.05, g: 0.3, b: 0.25)]),
+        ("Candy", [RGBA(r: 1, g: 0.55, b: 0.8), RGBA(r: 0.75, g: 0.55, b: 1), RGBA(r: 0.45, g: 0.8, b: 1)]),
+        ("Fire", [RGBA(r: 1, g: 0.9, b: 0.3), RGBA(r: 1, g: 0.45, b: 0.1), RGBA(r: 0.75, g: 0.05, b: 0.1)]),
+        ("Aurora", [RGBA(r: 0.1, g: 0.9, b: 0.6), RGBA(r: 0.2, g: 0.55, b: 1), RGBA(r: 0.6, g: 0.3, b: 1), RGBA(r: 1, g: 0.35, b: 0.75)]),
+        ("Mono", [RGBA(r: 0.95, g: 0.95, b: 0.97), RGBA(r: 0.35, g: 0.35, b: 0.4)]),
+        ("Night", [RGBA(r: 0.05, g: 0.05, b: 0.15), RGBA(r: 0.2, g: 0.1, b: 0.35)])
+    ]
+
+    /// Quick picks for solid tints and new gradient stops.
+    static let swatches: [RGBA] = [
+        RGBA(r: 1, g: 0.27, b: 0.23), RGBA(r: 1, g: 0.58, b: 0), RGBA(r: 1, g: 0.8, b: 0),
+        RGBA(r: 0.2, g: 0.78, b: 0.35), RGBA(r: 0, g: 0.78, b: 0.75), RGBA(r: 0, g: 0.48, b: 1),
+        RGBA(r: 0.35, g: 0.34, b: 0.84), RGBA(r: 0.69, g: 0.32, b: 0.87), RGBA(r: 1, g: 0.18, b: 0.33),
+        RGBA(r: 0.55, g: 0.36, b: 0.24), RGBA(r: 0.56, g: 0.56, b: 0.58), RGBA(r: 0.05, g: 0.05, b: 0.07)
+    ]
+
     /// Nothing to draw: the overlay window is skipped entirely.
     var isEmpty: Bool { fill == .none && !border && !shadow }
 
@@ -95,7 +143,7 @@ struct MenuBarStyle: Codable, Equatable {
         switch fill {
         case .none: return AnyShapeStyle(Color.clear)
         case .solid: return AnyShapeStyle(color1.color)
-        case .gradient:
+        case .gradient, .album:
             return AnyShapeStyle(linearGradient)
         }
     }
@@ -145,6 +193,7 @@ struct MenuBarStyle: Codable, Equatable {
 
     static let presets: [(String, MenuBarStyle)] = [
         ("Off", MenuBarStyle()),
+        ("Album", MenuBarStyle(fill: .album, intensity: 0.3)),
         ("Midnight", MenuBarStyle(fill: .solid, color1: RGBA(r: 0.0, g: 0.0, b: 0.05), intensity: 0.45)),
         ("Sunset", MenuBarStyle(fill: .gradient, gradientStops: stops([(1.0, 0.62, 0.20), (0.98, 0.30, 0.40),
                                                                        (0.55, 0.20, 0.85)], alpha: 1), intensity: 0.28)),

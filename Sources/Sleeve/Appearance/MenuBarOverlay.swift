@@ -75,7 +75,8 @@ final class MenuBarOverlayController {
 
         for screen in NSScreen.screens {
             guard let id = screen.displayID else { continue }
-            let style = settings.appearance.style(for: screen, isDark: isDark)
+            let album = spindle.state?.accent.map { RGBA(r: $0[0], g: $0[1], b: $0[2]) }
+            let style = settings.appearance.style(for: screen, isDark: isDark).resolved(album: album)
             guard !style.isEmpty else { continue }
             seen.insert(id)
 

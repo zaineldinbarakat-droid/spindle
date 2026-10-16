@@ -135,7 +135,7 @@ final class SleeveBarController {
         guard let screen = NSScreen.screens.first, let hosting = panel.contentView else { return }
         let size = hosting.fittingSize
         let barBottom = screen.frame.maxY - MenuBarGeometry.height(of: screen)
-        var x = (sections.toggleFrame?.minX ?? (screen.frame.maxX - size.width - 200)) - 6
+        var x = (sections.iconFrame?.minX ?? (screen.frame.maxX - size.width - 200)) - 6
         if let pill = spindle.state?.pillFrame, !pill.isEmpty, x < pill.maxX, x + size.width > pill.minX {
             x = pill.maxX + 8
         }
@@ -151,7 +151,7 @@ final class SleeveBarController {
             Task { @MainActor in
                 guard let self, let panel = self.panel else { return }
                 let point = NSEvent.mouseLocation
-                if !panel.frame.contains(point), !(self.sections.toggleFrame?.contains(point) ?? false) {
+                if !panel.frame.contains(point), !(self.sections.iconFrame?.contains(point) ?? false) {
                     self.close()
                 }
             }

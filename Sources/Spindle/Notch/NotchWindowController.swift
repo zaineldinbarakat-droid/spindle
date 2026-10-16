@@ -90,10 +90,20 @@ final class NotchWindowController {
             .debounce(for: .milliseconds(50), scheduler: RunLoop.main)
             .sink { [weak self] _ in self?.publishState() }
             .store(in: &cancellables)
+        // A new song's colour, for Sleeve's "Album" menu bar tint.
+        player.$accent.removeDuplicates()
+            .debounce(for: .milliseconds(300), scheduler: RunLoop.main)
+            .sink { [weak self] _ in self?.publishState() }
+            .store(in: &cancellables)
         player.$snapshot.map(\.hasTrack).removeDuplicates()
             .merge(with: timer.runningPublisher.removeDuplicates())
             .sink { [weak self] _ in self?.publishState() }
             .store(in: &cancellables)
+    }
+
+    private static func components(of color: Color) -> [Double]? {
+        guard let rgb = NSColor(color).usingColorSpace(.sRGB) else { return nil }
+        return [rgb.redComponent, rgb.greenComponent, rgb.blueComponent].map(Double.init)
     }
 
     private func setZen(_ enabled: Bool) {
@@ -108,7 +118,8 @@ final class NotchWindowController {
                                  hoverZone: viewModel.openOnHover ? metrics.hoverZone() : .zero,
                                  panelFrame: viewModel.isExpanded ? metrics.liveZone() : .zero,
                                  isExpanded: viewModel.isExpanded,
-                                 isZenHidden: viewModel.isZenHidden)
+                                 isZenHidden: viewModel.isZenHidden,
+                                 accent: Self.components(of: player.accent))
         SyncChannel.post(SyncChannel.spindleState, state.userInfo)
     }
 

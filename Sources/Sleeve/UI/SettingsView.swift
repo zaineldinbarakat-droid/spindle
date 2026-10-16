@@ -145,6 +145,7 @@ private struct GeneralTab: View {
             }
             Section("Icon style") {
                 IconStylePicker()
+                Toggle("Keep the icon in a fixed place (it never shifts as apps come and go)", isOn: $settings.fixedIcon)
                 Toggle("Reveal when hovering over Sleeve's icon", isOn: $settings.revealOnIconHover)
                 Toggle("Two-finger click the menu bar for Sleeve's menu (Show Hidden Apps and more)", isOn: $settings.revealOnTwoFingerClick)
 
@@ -214,7 +215,7 @@ private struct MenuBarColorPresets: View {
                     if settings.appearance.separateDarkStyle { settings.appearance.dark = style }
                 } label: {
                     VStack(spacing: 4) {
-                        MenuBarStyleView(style: style, layout: BarLayout(
+                        MenuBarStyleView(style: style.resolved(album: MenuBarStyle.sampleAlbum), layout: BarLayout(
                             size: CGSize(width: 96, height: 18), barHeight: 18,
                             appMenusEnd: 30, statusStart: 62, notch: nil))
                             .frame(width: 96, height: 18)
@@ -513,12 +514,13 @@ private struct SectionColumn: View {
 
 private struct AppearanceTab: View {
     @EnvironmentObject private var settings: SleeveSettings
+    @EnvironmentObject private var spindle: SpindleBridge
     @State private var target = "light"
 
     private var targets: [(String, String)] {
-        var list = [("light", settings.appearance.separateDarkStyle ? "Light Mode" : "All Modes")]
+        var list = [("light", settings.appearance.separateDarkStyle ? "Light Mode" : "Everywhere")]
         if settings.appearance.separateDarkStyle { list.append(("dark", "Dark Mode")) }
-        for screen in NSScreen.screens { list.append(("display:" + screen.localizedName, screen.localizedName)) }
+        for screen in NSScreen.screens { list.append(("display:" + screen.localizedName, "Only on " + screen.localizedName)) }
         return list
     }
 
@@ -543,68 +545,67 @@ private struct AppearanceTab: View {
             })
     }
 
+    private var albumColor: RGBA? {
+        spindle.state?.accent.map { RGBA(r: $0[0], g: $0[1], b: $0[2]) }
+    }
+
     var body: some View {
         Form {
             Section {
-                // Wallpaper, then the bar's contents, then the tint over everything —
-                // the same stacking as on the real menu bar.
-                ZStack(alignment: .topLeading) {
-                    LinearGradient(colors: [Color(red: 0.25, green: 0.45, blue: 0.75), Color(red: 0.55, green: 0.35, blue: 0.70)],
-                                   startPoint: .leading, endPoint: .trailing)
-                    previewContents
-                    MenuBarStyleView(style: binding.wrappedValue, layout: BarLayout(
-                        size: CGSize(width: 540, height: 30 + MenuBarStyleView.shadowDepth), barHeight: 30,
-                        appMenusEnd: 170, statusStart: 360, notch: nil))
-                }
-                .frame(width: 540, height: 46)
-                .clipShape(RoundedRectangle(cornerRadius: 6))
+                MenuBarPreview(style: binding.wrappedValue.resolved(album: albumColor))
+            } footer: {
+                Text("Exactly what your menu bar will look like.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
 
-            Section {
-                Toggle("Different style in Dark Mode", isOn: $settings.appearance.separateDarkStyle)
-                Picker("Editing", selection: $target) {
-                    ForEach(targets, id: \.0) { Text($0.1).tag($0.0) }
-                }
-                if target.hasPrefix("display:") {
-                    let name = String(target.dropFirst(8))
-                    if settings.appearance.displayOverrides[name] != nil {
-                        Button("Stop overriding this display") { settings.appearance.displayOverrides[name] = nil }
-                    } else {
-                        Text("Changing anything here gives this display its own style.")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                HStack {
-                    Text("Presets")
-                    ForEach(MenuBarStyle.presets, id: \.0) { preset in
-                        Button(preset.0) { binding.wrappedValue = preset.1 }
-                    }
-                }
+            Section("Quick looks") {
+                PresetGrid(apply: { binding.wrappedValue = $0 }, current: binding.wrappedValue)
             }
 
-            Section("Fill") {
-                Picker("Fill", selection: binding.fill) {
+            Section("Color") {
+                Picker("Color", selection: binding.fill) {
                     ForEach(MenuBarStyle.Fill.allCases) { Text($0.title).tag($0) }
                 }
                 .pickerStyle(.segmented)
+                .labelsHidden()
+
                 if binding.wrappedValue.fill != .none {
-                    LabeledContent("Intensity") {
+                    LabeledContent("Strength") {
                         HStack {
+                            Text("Subtle").font(.caption).foregroundStyle(.secondary)
                             Slider(value: binding.intensity, in: 0.05...0.8)
-                            Text("\(Int(binding.wrappedValue.intensity * 100))%").monospacedDigit().frame(width: 40)
+                            Text("Bold").font(.caption).foregroundStyle(.secondary)
                         }
                     }
                 }
-                if binding.wrappedValue.fill == .solid {
-                    ColorPicker("Color", selection: colorBinding(binding.color1))
-                }
-                if binding.wrappedValue.fill == .gradient {
+
+                switch binding.wrappedValue.fill {
+                case .none:
+                    Text("Your menu bar as macOS draws it.").font(.caption).foregroundStyle(.secondary)
+                case .solid:
+                    HStack(spacing: 6) {
+                        ForEach(Array(MenuBarStyle.swatches.enumerated()), id: \.offset) { _, swatch in
+                            Button { binding.wrappedValue.color1 = swatch } label: {
+                                Circle().fill(swatch.color).frame(width: 20, height: 20)
+                                    .overlay(Circle().strokeBorder(Color.primary.opacity(0.15)))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        ColorPicker("", selection: colorBinding(binding.color1)).labelsHidden()
+                    }
+                case .gradient:
                     GradientEditor(
                         stops: Binding(
                             // Older two-colour styles open with their two colours as stops.
                             get: { binding.wrappedValue.resolvedStops },
                             set: { binding.wrappedValue.gradientStops = $0 }),
                         angle: binding.gradientAngle)
+                case .album:
+                    Label(albumColor == nil
+                          ? "Follows the song playing in Spindle. Nothing's playing right now, so it's a soft grey."
+                          : "Follows the song playing in Spindle, changing with every track.",
+                          systemImage: "opticaldisc")
+                        .font(.caption)
                 }
             }
 
@@ -613,51 +614,123 @@ private struct AppearanceTab: View {
                     ForEach(MenuBarStyle.Shape.allCases) { Text($0.title).tag($0) }
                 }
                 .pickerStyle(.segmented)
+                .labelsHidden()
                 if binding.wrappedValue.shape != .full {
-                    LabeledContent("Corner radius") { Slider(value: binding.cornerRadius, in: 0...20) }
-                    LabeledContent("Inset") { Slider(value: binding.inset, in: 0...8) }
+                    LabeledContent("Roundness") { Slider(value: binding.cornerRadius, in: 0...20) }
+                    LabeledContent("Gap from edges") { Slider(value: binding.inset, in: 0...8) }
                 }
             }
 
-            Section("Shadow & Border") {
-                Toggle("Drop shadow", isOn: binding.shadow)
+            Section("Shadow & border") {
+                Toggle("Soft shadow under the bar", isOn: binding.shadow)
                 if binding.wrappedValue.shadow {
-                    LabeledContent("Strength") { Slider(value: binding.shadowOpacity, in: 0.05...0.8) }
+                    LabeledContent("Shadow strength") { Slider(value: binding.shadowOpacity, in: 0.05...0.8) }
                 }
-                Toggle("Border", isOn: binding.border)
+                Toggle("Thin border", isOn: binding.border)
                 if binding.wrappedValue.border {
                     ColorPicker("Border color", selection: colorBinding(binding.borderColor))
-                    LabeledContent("Width") { Slider(value: binding.borderWidth, in: 0.5...3) }
+                    LabeledContent("Border width") { Slider(value: binding.borderWidth, in: 0.5...3) }
                 }
             }
 
-            Section {
-                Text("Styles draw behind the menu bar, so they need the system menu bar background off (System Settings → Menu Bar → Show menu bar background).")
-                    .font(.caption).foregroundStyle(.secondary)
+            Section("When it applies") {
+                Toggle("Use a different look in Dark Mode", isOn: $settings.appearance.separateDarkStyle)
+                Picker("Editing the look for", selection: $target) {
+                    ForEach(targets, id: \.0) { Text($0.1).tag($0.0) }
+                }
+                if target.hasPrefix("display:") {
+                    let name = String(target.dropFirst(8))
+                    if settings.appearance.displayOverrides[name] != nil {
+                        Button("Use the same look as everywhere else") { settings.appearance.displayOverrides[name] = nil }
+                    } else {
+                        Text("Change anything above to give this display its own look.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                Button("Reset to No Color") { binding.wrappedValue = MenuBarStyle() }
             }
         }
         .formStyle(.grouped)
     }
 
-    private var previewContents: some View {
-        HStack(spacing: 14) {
-            Image(systemName: "apple.logo")
-            Text("Finder").bold()
-            Text("File")
-            Text("Edit")
-            Spacer()
-            Image(systemName: "wifi")
-            Image(systemName: "battery.75percent")
-            Text("12:00")
-        }
-        .font(.system(size: 12))
-        .foregroundStyle(.white)
-        .padding(.horizontal, 14)
-        .frame(height: 30)
-    }
-
     private func colorBinding(_ rgba: Binding<RGBA>) -> Binding<Color> {
         Binding(get: { rgba.wrappedValue.color }, set: { rgba.wrappedValue = RGBA($0) })
+    }
+}
+
+/// A miniature menu bar — wallpaper, menus, a notch, icons — with the style laid over
+/// it the way Sleeve lays it over the real one.
+private struct MenuBarPreview: View {
+    var style: MenuBarStyle
+
+    var body: some View {
+        let width: CGFloat = 540, bar: CGFloat = 30
+        ZStack(alignment: .topLeading) {
+            LinearGradient(colors: [Color(red: 0.22, green: 0.42, blue: 0.72), Color(red: 0.62, green: 0.38, blue: 0.62),
+                                    Color(red: 0.95, green: 0.62, blue: 0.45)],
+                           startPoint: .topLeading, endPoint: .bottomTrailing)
+            HStack(spacing: 13) {
+                Image(systemName: "apple.logo")
+                Text("Finder").bold()
+                Text("File")
+                Text("Edit")
+                Text("View")
+                Spacer()
+                Image(systemName: "eye")
+                Image(systemName: "wifi")
+                Image(systemName: "battery.75percent")
+                Image(systemName: "switch.2")
+                Text("Fri 12:00")
+            }
+            .font(.system(size: 12))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 14)
+            .frame(width: width, height: bar)
+            // The notch, centred, as on a MacBook.
+            UnevenRoundedRectangle(bottomLeadingRadius: 8, bottomTrailingRadius: 8, style: .continuous)
+                .fill(Color.black)
+                .frame(width: 92, height: bar)
+                .offset(x: (width - 92) / 2)
+            MenuBarStyleView(style: style, layout: BarLayout(
+                size: CGSize(width: width, height: bar + MenuBarStyleView.shadowDepth), barHeight: bar,
+                appMenusEnd: 190, statusStart: 330, notch: nil))
+        }
+        .frame(width: width, height: 64, alignment: .top)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .frame(maxWidth: .infinity)
+    }
+}
+
+/// The one-click looks, drawn as swatches of the real thing.
+private struct PresetGrid: View {
+    var apply: (MenuBarStyle) -> Void
+    var current: MenuBarStyle
+
+    var body: some View {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 8) {
+            ForEach(MenuBarStyle.presets, id: \.0) { name, style in
+                let selected = current == style
+                Button { apply(style) } label: {
+                    VStack(spacing: 4) {
+                        MenuBarStyleView(style: style.resolved(album: MenuBarStyle.sampleAlbum), layout: BarLayout(
+                            size: CGSize(width: 96, height: 18), barHeight: 18,
+                            appMenusEnd: 30, statusStart: 62, notch: nil))
+                            .frame(width: 96, height: 18)
+                            .background(LinearGradient(colors: [.blue.opacity(0.35), .purple.opacity(0.3)],
+                                                       startPoint: .leading, endPoint: .trailing))
+                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                        Text(name).font(.caption)
+                    }
+                    .padding(6)
+                    .frame(maxWidth: .infinity)
+                    .background(RoundedRectangle(cornerRadius: 8)
+                        .fill(selected ? Color.accentColor.opacity(0.18) : Color.primary.opacity(0.04)))
+                    .overlay(RoundedRectangle(cornerRadius: 8)
+                        .strokeBorder(selected ? Color.accentColor : .clear, lineWidth: 1.5))
+                }
+                .buttonStyle(.plain)
+            }
+        }
     }
 }
 

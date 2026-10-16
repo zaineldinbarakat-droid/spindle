@@ -65,6 +65,9 @@ final class SleeveSettings: ObservableObject {
 
     @Published var toggleIcon: ToggleIcon { didSet { save(toggleIcon.rawValue, "toggleIcon") } }
     @Published var revealOnHover: Bool { didSet { save(revealOnHover, "revealOnHover") } }
+    /// Draw Sleeve's icon at a fixed spot of its own so it never shifts as apps come
+    /// and go (macOS 27 moves status items around; see `FixedIconController`).
+    @Published var fixedIcon: Bool { didSet { save(fixedIcon, "fixedIcon") } }
     /// Hovering over Sleeve's own icon reveals, like pointing at Ice's icon.
     @Published var revealOnIconHover: Bool { didSet { save(revealOnIconHover, "revealOnIconHover") } }
     /// Two-finger click (secondary click) on Sleeve's icon or an empty part of the
@@ -180,6 +183,7 @@ final class SleeveSettings: ObservableObject {
         revealOnTwoFingerClick = bool("revealOnTwoFingerClick", true)
         d.removeObject(forKey: "showIcon")  // the icon is always shown now
         revealOnIconHover = bool("revealOnIconHover", true)
+        fixedIcon = bool("fixedIcon", true)
         customIconData = d.data(forKey: "customIconData")
         revealOnHover = bool("revealOnHover", true)
         revealOnScroll = bool("revealOnScroll", true)
