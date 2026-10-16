@@ -191,31 +191,32 @@ struct FocusControls: View {
     }
 }
 
-/// "25/5" or "50/10" at a glance; click to switch.
+/// One tap between the two timings: 25/5 and 50/10. The active one is lit; tapping
+/// the other switches straight away, no trip to Settings.
 private struct PresetMenu: View {
     @EnvironmentObject private var timer: PomodoroTimer
 
     var body: some View {
-        Menu {
+        HStack(spacing: 2) {
             ForEach(PomodoroTimer.Preset.all) { preset in
+                let selected = timer.currentPreset == preset
                 Button {
-                    timer.apply(preset)
+                    withAnimation(.notchQuick) { timer.apply(preset) }
                 } label: {
-                    Text(timer.currentPreset == preset ? "\u{2713} \(preset.name)" : preset.name)
+                    Text("\(preset.focus)/\(preset.shortBreak)")
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .foregroundStyle(selected ? Color.black : Theme.secondaryText)
+                        .padding(.horizontal, 9)
+                        .frame(height: 24)
+                        .background(Capsule().fill(selected ? Color.white : Color.clear))
+                        .contentShape(Capsule())
                 }
+                .buttonStyle(.plain)
+                .help(preset.name)
             }
-        } label: {
-            Text(timer.currentPreset.map { "\($0.focus)/\($0.shortBreak)" } ?? "Custom")
-                .font(.system(size: 11, weight: .semibold, design: .rounded))
-                .foregroundStyle(Theme.primaryText)
-                .padding(.horizontal, 10)
-                .frame(height: 30)
-                .background(Capsule().fill(Color.white.opacity(0.08)))
         }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
-        .fixedSize()
-        .help("Timer preset")
+        .padding(3)
+        .background(Capsule().fill(Color.white.opacity(0.1)))
     }
 }
 

@@ -1,5 +1,5 @@
 {
-  "version": "0.3.4",
-  "notes": "Spindle no longer crashes on play/pause/skip; Apple-style notch animation; Black notch is pure black; customizable playing indicator; Liquid Glass clarity slider. Sleeve stays out of Spindle's notch, two-finger click menu stays open, and a tip to keep its icon still.",
+  "version": "0.3.5",
+  "notes": "Spindle: smoother notch, pure black that matches the hardware notch, centred cover, one-tap 25/5 | 50/10, real Liquid Glass at Clear. Sleeve: hidden apps open in a drawer under the menu bar, so nothing slides.",
   "minimumSystemVersion": "14.0"
 }

@@ -14,16 +14,6 @@ struct NotchBackground: View {
 
     var body: some View {
         fill
-            // Shadow only *below* the panel: one cast all round also darkened the
-            // menu bar beside the notch, a halo that read as a bump as it opened.
-            .background(alignment: .bottom) {
-                RoundedRectangle(cornerRadius: Theme.outerCornerRadius, style: .continuous)
-                    .fill(Color.black.opacity(isExpanded ? 0.45 : 0))
-                    .frame(height: 36)
-                    .padding(.horizontal, 26)
-                    .blur(radius: 16)
-                    .offset(y: 12)
-            }
             // A new cover cross-fades the colour rather than cutting.
             .animation(.easeInOut(duration: 0.9), value: player.accent)
     }
@@ -79,9 +69,9 @@ struct NotchBackground: View {
 
         case .liquidGlass:
             if #available(macOS 26, *) {
-                LiquidGlassFill(shape: shape,
-                                clarity: viewModel.glassClarity,
-                                tint: viewModel.glassTinted ? player.accent : nil)
+                LiquidGlassFill(clarity: viewModel.glassClarity,
+                                tint: viewModel.glassTinted ? player.accent : nil,
+                                bottomRadius: shape.bottomRadius)
             } else {
                 shape.fill(Theme.panel)
             }
@@ -113,30 +103,73 @@ extension Color {
     }
 }
 
-/// Apple's Liquid Glass with a continuous clarity control.
+/// Apple's Liquid Glass with a continuous clarity control, from AppKit's own
+/// `NSGlassEffectView` — the same glass macOS draws its windows and controls with.
 ///
-/// The base is always Apple's *clear* glass — properly see-through, refracting what's
-/// behind it at the edges. Frosting is layered on top in proportion: a behind-window
-/// blur and a little dimming, both fading to nothing as clarity rises. One continuous
-/// slider, no jump between "regular" and "clear" halfway along.
+/// - Clear (top of the slider): nothing but Apple's *clear* glass — see-through,
+///   refracting what's behind it.
+/// - Frosted (bottom): the system's frosted material over it, dimmed a touch.
+/// In between, the frost fades in proportion, so the slider has no jumps. Shaped as
+/// a panel hanging from the top edge: its upper corners sit above the window, off
+/// screen, so only the rounded bottom shows.
 @available(macOS 26, *)
 struct LiquidGlassFill: View {
-    var shape: NotchShape
     var clarity: Double
     var tint: Color?
+    var bottomRadius: CGFloat
 
     var body: some View {
         let frost = 1 - min(max(clarity, 0), 1)
+        let shape = BottomRoundedRectangle(radius: bottomRadius)
         ZStack {
-            Color.clear
-                .glassEffect(.clear.tint(tint?.opacity(0.18 + 0.17 * frost)), in: shape)
+            AppleGlass(tint: tint.map { NSColor($0).withAlphaComponent(0.25) }, cornerRadius: bottomRadius)
+                .padding(.top, -bottomRadius)
             BehindWindowBlur()
-                .mask(shape)
-                .opacity(frost * 0.95)
-            // A touch of dimming keeps white text readable over bright desktops.
-            shape.fill(Color.black.opacity(0.08 + 0.32 * frost))
+                .clipShape(shape)
+                .opacity(frost)
+            shape.fill(Color.black.opacity(0.3 * frost))
         }
         .animation(.easeInOut(duration: 0.25), value: clarity)
+    }
+}
+
+@available(macOS 26, *)
+private struct AppleGlass: NSViewRepresentable {
+    var tint: NSColor?
+    var cornerRadius: CGFloat
+
+    func makeNSView(context: Context) -> NSGlassEffectView {
+        let view = NSGlassEffectView()
+        view.style = .clear
+        return view
+    }
+
+    func updateNSView(_ view: NSGlassEffectView, context: Context) {
+        view.cornerRadius = cornerRadius
+        view.tintColor = tint
+    }
+}
+
+/// Square at the top, rounded at the bottom: a panel hanging from the screen edge.
+struct BottomRoundedRectangle: Shape {
+    var radius: CGFloat
+    var animatableData: CGFloat {
+        get { radius }
+        set { radius = newValue }
+    }
+    func path(in rect: CGRect) -> Path {
+        let r = min(radius, rect.width / 2, rect.height)
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - r))
+        path.addArc(center: CGPoint(x: rect.maxX - r, y: rect.maxY - r), radius: r,
+                    startAngle: .degrees(0), endAngle: .degrees(90), clockwise: false)
+        path.addLine(to: CGPoint(x: rect.minX + r, y: rect.maxY))
+        path.addArc(center: CGPoint(x: rect.minX + r, y: rect.maxY - r), radius: r,
+                    startAngle: .degrees(90), endAngle: .degrees(180), clockwise: false)
+        path.closeSubpath()
+        return path
     }
 }
 
