@@ -2,12 +2,12 @@ import AppKit
 import Combine
 import SwiftUI
 
-/// A floating drawer just under the menu bar that shows the Hidden (and, with ⌥,
-/// Always Hidden) icons.
+/// A floating drawer just under the menu bar that shows the hidden apps — Ice's
+/// "Ice Bar".
 ///
-/// On a notched MacBook, revealing hidden icons in place can push them under the
-/// camera housing where they can't be seen or clicked. The bar lists them somewhere
-/// they can always be reached; clicking one opens its real menu.
+/// Revealing apps in the menu bar itself makes macOS rearrange the bar, which slides
+/// Sleeve's icon (and everything else) about under the cursor. The drawer shows them
+/// without touching the bar at all; clicking one opens its real menu.
 @MainActor
 final class SleeveBarController {
     private var panel: NSPanel?
@@ -15,6 +15,7 @@ final class SleeveBarController {
     private unowned let spindle: SpindleBridge
     private let model = SleeveBarModel()
     private var outsideClickMonitor: Any?
+    private var cursorMonitors: [Any] = []
     private var cancellables = Set<AnyCancellable>()
 
     var isOpen: Bool { panel?.isVisible == true }
@@ -49,8 +50,10 @@ final class SleeveBarController {
         }
 
         sections.keepAliveRect = panel.frame
+        sections.isBarOpen = true
         spindle.sleeveBarChanged(open: true)
         installOutsideClickMonitor()
+        installCursorWatch()
     }
 
     func close() {
@@ -62,15 +65,47 @@ final class SleeveBarController {
             Task { @MainActor in panel.orderOut(nil) }
         })
         sections.keepAliveRect = nil
+        sections.isBarOpen = false
+        // Closed with the cursor still on the bar (a click): hover waits until it leaves.
+        if MenuBarGeometry.isInMenuBar(NSEvent.mouseLocation, margin: 6) { sections.isHoverArmed = false }
         spindle.sleeveBarChanged(open: false)
         if let outsideClickMonitor { NSEvent.removeMonitor(outsideClickMonitor) }
         outsideClickMonitor = nil
+        cursorMonitors.forEach { NSEvent.removeMonitor($0) }
+        cursorMonitors.removeAll()
+    }
+
+    /// Closes the moment the cursor is off both the menu bar and the drawer — unless a
+    /// menu it opened is still showing.
+    private func installCursorWatch() {
+        let check: () -> Void = { [weak self] in
+            guard let self, let panel = self.panel, panel.isVisible else { return }
+            let point = NSEvent.mouseLocation
+            if MenuBarGeometry.isInMenuBar(point, margin: 6) { return }
+            if panel.frame.insetBy(dx: -10, dy: -10).contains(point) { return }
+            if SectionManager.isAnyMenuOpen() { return }
+            self.close()
+        }
+        let events: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDragged]
+        if let global = NSEvent.addGlobalMonitorForEvents(matching: events, handler: { _ in
+            Task { @MainActor in check() }
+        }) { cursorMonitors.append(global) }
+        if let local = NSEvent.addLocalMonitorForEvents(matching: events, handler: { event in
+            Task { @MainActor in check() }
+            return event
+        }) { cursorMonitors.append(local) }
     }
 
     private func refreshItems() {
-        var list = sections.items(in: .hidden)
-        if model.includeAlwaysHidden { list += sections.items(in: .alwaysHidden) }
-        model.items = list
+        var list: [MenuBarItem]
+        if SleeveSettings.shared.hideAllApps {
+            // Every app hide-all keeps out of the bar, one button per icon.
+            list = sections.items.filter { sections.isHiddenByHideAll($0) }
+        } else {
+            list = sections.items(in: .hidden)
+            if model.includeAlwaysHidden { list += sections.items(in: .alwaysHidden) }
+        }
+        model.items = list.sorted { $0.ownerName.localizedCaseInsensitiveCompare($1.ownerName) == .orderedAscending }
         if let panel, panel.isVisible { position(panel) }
     }
 
@@ -94,16 +129,14 @@ final class SleeveBarController {
         return panel
     }
 
-    /// Right-aligned under the Sleeve toggle, clear of Spindle's panel and the notch.
+    /// Starts under Sleeve's icon and runs right, toward where the apps normally sit;
+    /// never under the notch or Spindle's pill.
     private func position(_ panel: NSPanel) {
         guard let screen = NSScreen.screens.first, let hosting = panel.contentView else { return }
         let size = hosting.fittingSize
         let barBottom = screen.frame.maxY - MenuBarGeometry.height(of: screen)
-        var anchorX = sections.toggleFrame?.maxX ?? (screen.frame.maxX - 200)
-        var x = anchorX - size.width
-        // Never under the notch / Spindle: shift right of it if we'd overlap.
+        var x = (sections.toggleFrame?.minX ?? (screen.frame.maxX - size.width - 200)) - 6
         if let pill = spindle.state?.pillFrame, !pill.isEmpty, x < pill.maxX, x + size.width > pill.minX {
-            anchorX = max(anchorX, pill.maxX + size.width + 8)
             x = pill.maxX + 8
         }
         x = min(max(x, screen.frame.minX + 6), screen.frame.maxX - size.width - 6)

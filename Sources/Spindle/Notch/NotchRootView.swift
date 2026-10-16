@@ -78,24 +78,23 @@ struct NotchRootView: View {
         let thumb = metrics.notchHeight - 10
 
         return HStack(spacing: 0) {
+            // Centred in its wing (clear of the shoulder where the shape meets the
+            // bezel) rather than pushed against the outer edge.
             HStack(spacing: 0) {
                 if viewModel.collapsedShowsCover {
                     CollapsedCover(size: thumb)
                 } else {
                     ArtworkThumbnail(size: thumb)
                 }
-                Spacer(minLength: 0)
             }
-            // Clear of the inverted fillet where the shape meets the bezel.
-            .padding(.leading, Theme.notchCornerRadius + 2)
+            .frame(maxWidth: .infinity)
+            .padding(.leading, Theme.notchCornerRadius)
             .frame(width: Theme.collapsedWingWidth)
 
             Spacer(minLength: 0)
                 .frame(width: metrics.notchWidth)
 
             HStack(spacing: 0) {
-                Spacer(minLength: 0)
-
                 if timer.isActive {
                     CollapsedCountdown()
                 } else if viewModel.showVisualizer {
@@ -106,7 +105,8 @@ struct NotchRootView: View {
                                  glow: viewModel.indicatorGlow)
                 }
             }
-            .padding(.trailing, Theme.notchCornerRadius + 2)
+            .frame(maxWidth: .infinity)
+            .padding(.trailing, Theme.notchCornerRadius)
             .frame(width: Theme.collapsedWingWidth)
         }
     }
@@ -164,34 +164,8 @@ struct NotchRootView: View {
         let wingWidth = (Theme.expandedWidth - metrics.notchWidth) / 2
 
         return HStack(spacing: 0) {
-            // The whole left wing is one button, so a click aimed at the collapsed pill's
-            // little record still opens the music app after hover has expanded the panel.
-            Button {
-                player.openSourceApp()
-            } label: {
-                HStack(spacing: 5) {
-                    Circle()
-                        .fill(player.snapshot.isPlaying ? player.accent : Color.white.opacity(0.28))
-                        .frame(width: 5, height: 5)
-
-                    Text(player.snapshot.hasTrack
-                         ? player.snapshot.provider.displayName
-                         : "Spindle")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(Theme.secondaryText)
-
-                    Image(systemName: "arrow.up.forward")
-                        .font(.system(size: 7, weight: .bold))
-                        .foregroundStyle(Theme.tertiaryText)
-
-                    Spacer(minLength: 0)
-                }
-                .padding(.leading, 16)
-                .frame(width: wingWidth, height: metrics.notchHeight)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .help("Open \(player.sourceProvider.displayName)")
+            // Left of the notch stays empty: the album cover is how you open the app.
+            Color.clear.frame(width: wingWidth, height: metrics.notchHeight)
 
             Spacer(minLength: metrics.notchWidth)
 
@@ -211,8 +185,6 @@ struct NotchRootView: View {
                 }
 
                 TabSwitcher()
-
-                ProviderPicker()
 
                 Button {
                     SettingsWindow.show()
@@ -314,44 +286,5 @@ private struct CollapsedCountdown: View {
                 .monospacedDigit()
                 .foregroundStyle(timer.isRunning ? timer.phase.color : Theme.tertiaryText)
         }
-    }
-}
-
-/// Lets the user pin the display to one app instead of following whatever is playing.
-private struct ProviderPicker: View {
-    @EnvironmentObject private var player: PlayerManager
-
-    var body: some View {
-        Menu {
-            Button {
-                player.pinnedProvider = nil
-            } label: {
-                // A checkmark in the title rather than a Label: an empty systemImage
-                // still reserves an icon slot and knocks the titles out of alignment.
-                Text(player.pinnedProvider == nil
-                     ? "\u{2713} Follow whatever is playing"
-                     : "Follow whatever is playing")
-            }
-
-            Divider()
-
-            ForEach(ProviderID.allCases) { provider in
-                Button {
-                    player.pinnedProvider = provider
-                } label: {
-                    Text(player.pinnedProvider == provider
-                         ? "\u{2713} \(provider.displayName)"
-                         : provider.displayName)
-                }
-                .disabled(!player.availableProviders.contains(provider))
-            }
-        } label: {
-            Image(systemName: "music.note.list")
-                .font(.system(size: 11))
-                .foregroundStyle(Theme.tertiaryText)
-        }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
-        .fixedSize()
     }
 }

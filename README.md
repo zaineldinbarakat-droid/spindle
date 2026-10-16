@@ -20,12 +20,12 @@ Built and verified against a MacBook Pro `Mac17,2` on macOS 27.0.
 
 - **Notch turntable.** Hover the notch: the record spins with the cover art on the label,
   and the tonearm tracks the playhead. Drag the arm to scrub.
-- **Click to open the source app.** Click the record (in the notch, a widget or full
-  screen), the track title, or the left side of the notch strip, and Spotify or Music
-  comes to the front with its window showing.
-- **Focus timer.** The timer tab in the notch is a Pomodoro clock with two presets —
-  *Classic* 25/5 (15-minute long break) and *Deep Work* 50/10 (30-minute long break) —
-  switchable from the timer tab, the menu or Settings, and every length adjustable. While it runs, the
+- **Click the album cover to open the source app.** Click the cover or the record (in
+  the notch, a widget or full screen) or the track title, and Spotify or Music comes to
+  the front with its window showing.
+- **Focus timer.** The timer tab in the notch is a Pomodoro clock with a one-tap
+  **25/5 | 50/10** switch right beside Start (long breaks of 15 and 30 minutes), and
+  every length adjustable in Settings. While it runs, the
   countdown sits in the collapsed notch. When a phase ends you get a chime and a
   notification, and the notch drops open briefly. It can also pause your music during
   breaks and start it again when focus begins.
@@ -43,8 +43,12 @@ Built and verified against a MacBook Pro `Mac17,2` on macOS 27.0.
 - **Feels like Apple made it.** The notch springs open like the Dynamic Island, with
   the slightest settle, and its content resolves out of a blur rather than popping in;
   its sides flare smoothly out of the hardware notch.
-- **Liquid Glass with a Clarity slider**, from frosted to properly see-through (Apple's
-  clear glass), optionally tinted with the album's colour.
+- **Liquid Glass with a Clarity slider**: at *Clear* it's AppKit's own
+  `NSGlassEffectView` in its clear style — real, see-through Liquid Glass — and toward
+  *Frosted* the system's frosted material fades in. Optionally tinted with the album's
+  colour.
+- **Seamless with the hardware notch.** Pure #000 black, small shoulders and gently
+  rounded corners like the MacBook's notch; no album colour reaches it unless you ask.
 - **Notch look.** *Song Color* (the default) washes the open panel in a deep tint of
   the cover's dominant colour, cross-fading when the song changes, while the notch
   itself stays hardware-black — or let the colour reach into the notch too; *Black*
@@ -85,8 +89,9 @@ of the screen.
   an empty stretch of the bar, scrolling/swiping on the bar, or a hotkey.
 - **Auto-rehide** when the cursor leaves the menu bar (never while a menu is open), after
   a delay, or never.
-- **Sleeve Bar.** A floating drawer under the menu bar that lists hidden icons, so on a
-  notched MacBook they can't end up behind the camera. Click one and its real menu opens.
+- **The drawer (default).** Hovering shows your hidden apps in a drawer just under the
+  menu bar, like Ice's Ice Bar, so nothing in the bar moves — Sleeve's icon included.
+  Click one and its real menu opens. Prefer them in the bar itself? One switch.
 - **Menu bar color, the Ice way.** A light tint laid over the whole menu bar — edge to
   edge, flush with the top of the screen, notch and all — at an adjustable intensity
   (20% by default, Ice's own strength), so icons and menus show through tinted.

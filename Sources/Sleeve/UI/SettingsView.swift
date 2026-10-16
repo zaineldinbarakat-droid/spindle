@@ -128,6 +128,15 @@ private struct GeneralTab: View {
             }
             Section("What to hide") {
                 Toggle("Hide all app icons until I hover over the menu bar", isOn: $settings.hideAllApps)
+                Picker("Show hidden apps", selection: $settings.useSleeveBar) {
+                    Text("In a drawer below the bar").tag(true)
+                    Text("Right in the menu bar").tag(false)
+                }
+                .pickerStyle(.radioGroup)
+                Text(settings.useSleeveBar
+                     ? "Nothing in the menu bar moves: your apps appear in a drawer just under it."
+                     : "Your apps appear in the menu bar itself. macOS rearranges the bar to fit them, so other icons shift while they show.")
+                    .font(.caption).foregroundStyle(.secondary)
                 Text(settings.hideAllApps
                      ? "Like Ice: the bar shows only Sleeve and Apple's own icons until the cursor reaches the right side of the menu bar. Pick apps to always keep visible under Layout."
                      : "Only icons you ⌘-drag into the Hidden sections are hidden.")
@@ -137,9 +146,7 @@ private struct GeneralTab: View {
                 IconStylePicker()
                 Toggle("Reveal when hovering over Sleeve's icon", isOn: $settings.revealOnIconHover)
                 Toggle("Two-finger click the empty menu bar to show or hide apps", isOn: $settings.revealOnTwoFingerClick)
-                if !settings.hideAllApps {
-                    Toggle("Show hidden icons in the Sleeve Bar (recommended on notched Macs)", isOn: $settings.useSleeveBar)
-                }
+
                 Text("Hover or click Sleeve's icon to show your apps · two-finger click it for options (Zen mode, search, menu bar color…). Tip: ⌘-drag Sleeve's icon next to the clock, so revealed apps appear to its left and it stays put under your cursor.")
                     .font(.caption).foregroundStyle(.secondary)
             }

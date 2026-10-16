@@ -47,6 +47,7 @@ final class SleeveAppDelegate: NSObject, NSApplicationDelegate {
             env.sections.menuProvider = { [weak self] in self?.makeMenu() ?? NSMenu() }
             env.sections.onToggleClickedForBar = { env.bar.toggle() }
             env.sections.onHoverRevealForBar = { env.bar.open() }
+            env.sections.onCloseBar = { env.bar.close() }
             env.gestures.showBar = { env.bar.open() }
             env.gestures.hideBar = { env.bar.close() }
             // One dropdown at a time.
@@ -64,7 +65,7 @@ final class SleeveAppDelegate: NSObject, NSApplicationDelegate {
             HotkeyCenter.shared.handler = { action in
                 switch action {
                 case .toggleHidden:
-                    (env.settings.useSleeveBar && !env.settings.hideAllApps) ? env.bar.toggle() : env.sections.toggle()
+                    env.settings.useSleeveBar ? env.bar.toggle() : env.sections.toggle()
                 case .showAll:
                     env.settings.useSleeveBar ? env.bar.toggle(includeAlwaysHidden: true) : env.sections.toggleAll()
                 case .search: env.search.toggle()

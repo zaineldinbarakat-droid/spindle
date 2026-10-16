@@ -5,7 +5,8 @@ enum Theme {
 
     /// The notch panel is always dark — it has to read as an extension of the bezel,
     /// so it deliberately ignores the system appearance.
-    static let panel = Color.black
+    /// Exactly #000000 in sRGB, the closest a display gets to the hardware notch.
+    static let panel = Color(.sRGB, red: 0, green: 0, blue: 0, opacity: 1)
     static let primaryText = Color.white
     static let secondaryText = Color.white.opacity(0.62)
     static let tertiaryText = Color.white.opacity(0.38)
@@ -21,8 +22,10 @@ enum Theme {
     static let cream = Color(red: 0.96, green: 0.91, blue: 0.80)
 
     /// Corner radii for the shape that hangs below the notch.
-    static let outerCornerRadius: CGFloat = 24
-    static let notchCornerRadius: CGFloat = 12
+    static let outerCornerRadius: CGFloat = 22
+    /// Matches the MacBook notch: small shoulders where it meets the top edge and
+    /// gently rounded lower corners.
+    static let notchCornerRadius: CGFloat = 8
 
     static let collapsedWingWidth: CGFloat = 64
     static let expandedWidth: CGFloat = 500
@@ -39,16 +42,15 @@ enum Theme {
 }
 
 /// How content arrives and leaves inside the island, the way the Dynamic Island's
-/// does: it resolves out of a blur while growing a touch from the top, rather than
-/// popping in or merely fading.
+/// does: it fades while growing a touch from the top, rather than popping in. (No
+/// blur: re-rendering a blur over the whole panel each frame dropped frames.)
 struct IslandContent: ViewModifier {
     var progress: Double
 
     func body(content: Content) -> some View {
         content
             .opacity(progress)
-            .blur(radius: (1 - progress) * 8)
-            .scaleEffect(0.94 + 0.06 * progress, anchor: .top)
+            .scaleEffect(0.96 + 0.04 * progress, anchor: .top)
     }
 }
 
@@ -69,7 +71,7 @@ extension Animation {
     /// Opening, after the Dynamic Island: the shape springs out of the notch and
     /// settles with the slightest overshoot — enough to feel physical, not bouncy. A
     /// spring keeps its velocity if interrupted, so a quick in-and-out never snaps.
-    static var notch: Animation { .spring(duration: 0.5, bounce: 0.2) }
+    static var notch: Animation { .spring(duration: 0.45, bounce: 0.12) }
     /// Closing is quicker and doesn't overshoot: it tucks back into the hardware.
     static var notchClose: Animation { .spring(duration: 0.38, bounce: 0.04) }
     static var notchQuick: Animation { .spring(response: 0.22, dampingFraction: 0.9) }

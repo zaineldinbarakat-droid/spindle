@@ -138,6 +138,12 @@ final class SleeveSettings: ObservableObject {
             d.set(4, forKey: "settingsVersion")
             if d.string(forKey: "toggleIcon") == "emoji" { d.set(ToggleIcon.eye.rawValue, forKey: "toggleIcon") }
         }
+        // v5: hidden apps show in a drawer under the menu bar by default, so nothing in
+        // the bar slides about when they appear.
+        if d.integer(forKey: "settingsVersion") < 5 {
+            d.set(5, forKey: "settingsVersion")
+            d.set(true, forKey: "useSleeveBar")
+        }
         toggleIcon = ToggleIcon(rawValue: d.string(forKey: "toggleIcon") ?? "") ?? .eye
         revealOnTwoFingerClick = bool("revealOnTwoFingerClick", true)
         d.removeObject(forKey: "showIcon")  // the icon is always shown now
@@ -148,11 +154,7 @@ final class SleeveSettings: ObservableObject {
         revealOnEmptyClick = bool("revealOnEmptyClick", false)
         rehideMode = RehideMode(rawValue: d.string(forKey: "rehideMode") ?? "") ?? .smart
         rehideDelay = d.object(forKey: "rehideDelay") == nil ? 8 : d.double(forKey: "rehideDelay")
-        // Default on for notched Macs, where in-place reveal can push items under the
-        // camera — except on macOS 27, where hidden icons never move (they're covered,
-        // not pushed), so revealing them in place is always safe.
-        let hasNotch = NSScreen.screens.contains { $0.safeAreaInsets.top > 0 }
-        useSleeveBar = bool("useSleeveBar", hasNotch && !SectionManager.isModernMenuBar)
+        useSleeveBar = bool("useSleeveBar", true)
         useNativeHiding = bool("useNativeHiding", true)
         // First launch of the version that introduced hide-all: it only makes sense
         // with hover-to-reveal, so switch that on once, whatever was saved before.

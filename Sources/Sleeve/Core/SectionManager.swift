@@ -703,7 +703,7 @@ final class SectionManager: ObservableObject {
             showHowToHide()
             return
         }
-        if settings.useSleeveBar && !settings.hideAllApps {
+        if settings.useSleeveBar {
             onToggleClickedForBar?()
         } else {
             toggle()
@@ -728,10 +728,10 @@ final class SectionManager: ObservableObject {
     /// Reveal the way the user's settings ask for: everything in hide-all mode, the
     /// Sleeve Bar if that's the reveal style, otherwise the Hidden section in place.
     func revealForUser() {
-        if settings.hideAllApps {
-            reveal(.all)
-        } else if settings.useSleeveBar {
+        if settings.useSleeveBar {
             onHoverRevealForBar?()
+        } else if settings.hideAllApps {
+            reveal(.all)
         } else {
             reveal(.hidden)
         }
@@ -746,6 +746,7 @@ final class SectionManager: ObservableObject {
         // treat anything within 0.35 s as the same click.
         guard Date.now.timeIntervalSince(lastUserToggle) > 0.35 else { return }
         lastUserToggle = .now
+        if isBarOpen { onCloseBar?(); return }
         state == .collapsed ? revealForUser() : collapse()
     }
 
@@ -846,8 +847,15 @@ final class SectionManager: ObservableObject {
         toggleItem.length = 26
     }
 
+    /// The Sleeve Bar is showing: the icon wears its "open" face meanwhile.
+    var isBarOpen = false {
+        didSet { if isBarOpen != oldValue { updateIcons() } }
+    }
+    /// Closes the Sleeve Bar (set by the app, which owns it).
+    var onCloseBar: (() -> Void)?
+
     private func updateIcons() {
-        let showing = state != .collapsed || isHoveringIcon
+        let showing = state != .collapsed || isHoveringIcon || isBarOpen
         let style = settings.toggleIcon
         let previous = shownFace
         shownFace = (style, showing)

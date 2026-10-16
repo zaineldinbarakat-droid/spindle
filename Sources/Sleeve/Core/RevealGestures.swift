@@ -85,13 +85,13 @@ final class RevealGestures {
     }
 
     private func reveal() {
-        if settings.hideAllApps { return sections.reveal(.all) }
-        if settings.useSleeveBar { showBar?() } else { sections.reveal(.hidden) }
+        if settings.useSleeveBar { return showBar?() ?? () }
+        sections.reveal(settings.hideAllApps ? .all : .hidden)
     }
 
     private func conceal() {
-        if settings.hideAllApps { return sections.collapse() }
-        if settings.useSleeveBar { hideBar?() } else { sections.collapse() }
+        if settings.useSleeveBar { return hideBar?() ?? () }
+        sections.collapse()
     }
 
     private func mouseMoved() {
