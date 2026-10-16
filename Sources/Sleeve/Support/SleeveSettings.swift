@@ -90,6 +90,37 @@ final class SleeveSettings: ObservableObject {
     @Published var hideAllApps: Bool { didSet { save(hideAllApps, "hideAllApps") } }
     /// Apps kept visible even with `hideAllApps` on.
     @Published var alwaysShownBundles: [String] { didSet { save(alwaysShownBundles, "alwaysShownBundles") } }
+    /// Apps that never appear in the menu bar, not even on hover — they live in the
+    /// hidden section (opened from Sleeve's menu), alongside anything macOS couldn't fit.
+    @Published var hiddenSectionBundles: [String] { didSet { save(hiddenSectionBundles, "hiddenSectionBundles") } }
+
+    enum AppPlacement: String, CaseIterable, Identifiable {
+        case always, onHover, hidden
+        var id: String { rawValue }
+        var title: String {
+            switch self {
+            case .always: return "Always"
+            case .onHover: return "On Hover"
+            case .hidden: return "Hidden"
+            }
+        }
+    }
+
+    func placement(of bundle: String) -> AppPlacement {
+        if alwaysShownBundles.contains(bundle) { return .always }
+        if hiddenSectionBundles.contains(bundle) { return .hidden }
+        return .onHover
+    }
+
+    func setPlacement(_ placement: AppPlacement, for bundle: String) {
+        alwaysShownBundles.removeAll { $0 == bundle }
+        hiddenSectionBundles.removeAll { $0 == bundle }
+        switch placement {
+        case .always: alwaysShownBundles.append(bundle)
+        case .hidden: hiddenSectionBundles.append(bundle)
+        case .onHover: break
+        }
+    }
 
     // MARK: Spindle
 
@@ -138,11 +169,12 @@ final class SleeveSettings: ObservableObject {
             d.set(4, forKey: "settingsVersion")
             if d.string(forKey: "toggleIcon") == "emoji" { d.set(ToggleIcon.eye.rawValue, forKey: "toggleIcon") }
         }
-        // v5: hidden apps show in a drawer under the menu bar by default, so nothing in
-        // the bar slides about when they appear.
-        if d.integer(forKey: "settingsVersion") < 5 {
-            d.set(5, forKey: "settingsVersion")
-            d.set(true, forKey: "useSleeveBar")
+        // v6: on hover, apps appear in the menu bar itself again; the drawer is now the
+        // hidden section, opened from Sleeve's menu. (v5 had briefly made the drawer
+        // the place hover showed apps.)
+        if d.integer(forKey: "settingsVersion") < 6 {
+            d.set(6, forKey: "settingsVersion")
+            d.set(false, forKey: "useSleeveBar")
         }
         toggleIcon = ToggleIcon(rawValue: d.string(forKey: "toggleIcon") ?? "") ?? .eye
         revealOnTwoFingerClick = bool("revealOnTwoFingerClick", true)
@@ -154,7 +186,7 @@ final class SleeveSettings: ObservableObject {
         revealOnEmptyClick = bool("revealOnEmptyClick", false)
         rehideMode = RehideMode(rawValue: d.string(forKey: "rehideMode") ?? "") ?? .smart
         rehideDelay = d.object(forKey: "rehideDelay") == nil ? 8 : d.double(forKey: "rehideDelay")
-        useSleeveBar = bool("useSleeveBar", true)
+        useSleeveBar = bool("useSleeveBar", false)
         useNativeHiding = bool("useNativeHiding", true)
         // First launch of the version that introduced hide-all: it only makes sense
         // with hover-to-reveal, so switch that on once, whatever was saved before.
@@ -165,6 +197,7 @@ final class SleeveSettings: ObservableObject {
         }
         hideAllApps = bool("hideAllApps", true)
         alwaysShownBundles = d.stringArray(forKey: "alwaysShownBundles") ?? []
+        hiddenSectionBundles = d.stringArray(forKey: "hiddenSectionBundles") ?? []
         avoidSpindle = bool("avoidSpindle", true)
         zenHidesSpindle = bool("zenHidesSpindle", true)
 

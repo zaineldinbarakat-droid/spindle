@@ -65,7 +65,7 @@ final class SleeveAppDelegate: NSObject, NSApplicationDelegate {
             HotkeyCenter.shared.handler = { action in
                 switch action {
                 case .toggleHidden:
-                    env.settings.useSleeveBar ? env.bar.toggle() : env.sections.toggle()
+                    (env.settings.useSleeveBar && !env.settings.hideAllApps) ? env.bar.toggle() : env.sections.toggle()
                 case .showAll:
                     env.settings.useSleeveBar ? env.bar.toggle(includeAlwaysHidden: true) : env.sections.toggleAll()
                 case .search: env.search.toggle()
@@ -116,7 +116,13 @@ final class SleeveAppDelegate: NSObject, NSApplicationDelegate {
             return item
         }
 
-        _ = add(env.sections.state == .collapsed ? "Show Hidden Apps" : "Hide Apps") { env.sections.toggleForUser() }
+        if env.settings.hideAllApps {
+            let count = env.sections.hiddenSectionItems.count
+            _ = add(count > 0 ? "Show Hidden Apps (\(count))" : "Show Hidden Apps") { env.bar.open() }
+            _ = add(env.sections.state == .collapsed ? "Show Menu Bar Apps" : "Hide Menu Bar Apps") { env.sections.toggleForUser() }
+        } else {
+            _ = add(env.sections.state == .collapsed ? "Show Hidden Apps" : "Hide Apps") { env.sections.toggleForUser() }
+        }
         if !env.settings.hideAllApps {
             _ = add(env.sections.state == .all ? "Hide Always Hidden Apps" : "Show Everything") { env.sections.toggleAll() }
         }

@@ -158,6 +158,19 @@ enum MenuBarScanner {
         return items.sorted { $0.frame.minX > $1.frame.minX }
     }
 
+    /// macOS 27's own "Show Hidden Menu Bar Items" button, if it's in the bar.
+    static func overflowButton() -> AXUIElement? {
+        guard AXIsProcessTrusted(),
+              let agent = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.MenuBarAgent").first else {
+            return nil
+        }
+        let element = AXUIElementCreateApplication(agent.processIdentifier)
+        AXUIElementSetMessagingTimeout(element, 0.3)
+        guard let extras: AXUIElement = element.attribute("AXExtrasMenuBar"),
+              let children: [AXUIElement] = extras.attribute(kAXChildrenAttribute) else { return nil }
+        return children.first { (($0.attribute(kAXRoleAttribute) as String?) ?? "") == kAXButtonRole }
+    }
+
     /// Frontmost app's menus (Apple, File, Edit…): where the empty bar begins.
     static func appMenusMaxX() -> CGFloat? {
         guard AXIsProcessTrusted(), let app = NSWorkspace.shared.frontmostApplication else { return nil }

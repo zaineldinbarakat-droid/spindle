@@ -85,11 +85,14 @@ final class RevealGestures {
     }
 
     private func reveal() {
+        // Hide-all always shows apps in the bar itself; the drawer is the hidden section.
+        if settings.hideAllApps { return sections.reveal(.all) }
         if settings.useSleeveBar { return showBar?() ?? () }
-        sections.reveal(settings.hideAllApps ? .all : .hidden)
+        sections.reveal(.hidden)
     }
 
     private func conceal() {
+        if settings.hideAllApps { return sections.collapse() }
         if settings.useSleeveBar { return hideBar?() ?? () }
         sections.collapse()
     }
@@ -120,8 +123,8 @@ final class RevealGestures {
         guard settings.revealOnTwoFingerClick else { return }
         let point = NSEvent.mouseLocation
         // On macOS 27 a secondary click on Sleeve's own icon arrives here too (the
-        // button often never sees it). On the icon it opens Sleeve's menu; anywhere
-        // else on the empty bar it shows or hides.
+        // button often never sees it). Anywhere on the bar that isn't another app's
+        // icon, it opens Sleeve's menu — "Show Hidden Apps" first.
         if let icon = sections.toggleFrame, icon.insetBy(dx: -2, dy: -6).contains(point) {
             sections.showMenu()
             return
@@ -132,7 +135,7 @@ final class RevealGestures {
            point.x > l.maxX - 4, point.x < r.minX + 4 {
             return
         }
-        sections.toggleForUser()
+        sections.showMenu()
     }
 
     private func isOverAnyIcon(_ point: CGPoint) -> Bool {

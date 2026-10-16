@@ -63,6 +63,7 @@ final class SectionManager: ObservableObject {
     @Published private(set) var items: [MenuBarItem] = [] {
         didSet {
             updateSectionCache()
+            rememberOverflow()
             reapplyIfSomethingSlippedThrough()
             offerPlacementTipIfNeeded()
         }
@@ -157,9 +158,10 @@ final class SectionManager: ObservableObject {
         iconHover.onEnter = { [weak self] in self?.iconHoverBegan() }
         iconHover.onExit = { [weak self] in self?.iconHoverEnded() }
         // Changing how or what to hide re-applies the current state the new way.
-        Publishers.Merge3(settings.$useNativeHiding.dropFirst().map { _ in () },
+        Publishers.Merge4(settings.$useNativeHiding.dropFirst().map { _ in () },
                           settings.$hideAllApps.dropFirst().map { _ in () },
-                          settings.$alwaysShownBundles.dropFirst().map { _ in () })
+                          settings.$alwaysShownBundles.dropFirst().map { _ in () },
+                          settings.$hiddenSectionBundles.dropFirst().map { _ in () })
             .sink { [weak self] _ in
             DispatchQueue.main.async {
                 guard let self else { return }
@@ -260,6 +262,39 @@ final class SectionManager: ObservableObject {
         return result
     }
 
+    // MARK: - Hidden section
+
+    /// Apps opened from the hidden section, let into the bar until the next hide.
+    private var temporarilyShown: Set<String> = []
+    /// Icons macOS pushed into its own overflow because the bar was full, as last seen
+    /// while apps were showing (while hidden, their positions are stale).
+    private var overflowedIDs: Set<String> = []
+
+    func isInHiddenSection(_ item: MenuBarItem) -> Bool {
+        guard let bundle = item.bundleID else { return false }
+        return settings.hiddenSectionBundles.contains(bundle)
+    }
+
+    private func isTemporarilyShown(_ item: MenuBarItem) -> Bool {
+        item.bundleID.map(temporarilyShown.contains) ?? false
+    }
+
+    /// What the hidden section lists: apps kept out of the bar on purpose, plus any
+    /// that didn't fit.
+    var hiddenSectionItems: [MenuBarItem] {
+        var seen = Set<String>()
+        return items.filter { item in
+            guard !isOwn(item), !item.isNativeSystemItem else { return false }
+            guard isInHiddenSection(item) || overflowedIDs.contains(item.id) else { return false }
+            return seen.insert(item.id).inserted
+        }
+    }
+
+    private func rememberOverflow() {
+        guard state != .collapsed else { return }
+        overflowedIDs = Set(items.filter { $0.isOverflowed && !$0.isNativeSystemItem }.map(\.id))
+    }
+
     /// Whether hide-all mode hides this icon while collapsed.
     func isHiddenByHideAll(_ item: MenuBarItem) -> Bool {
         guard !item.isOverflowed, !item.isNativeSystemItem else { return false }
@@ -273,11 +308,16 @@ final class SectionManager: ObservableObject {
     /// (an app launched after the restriction, a bundleless icon, an icon dragged
     /// into a hidden section) means the allow-list is out of date: refresh it.
     private func reapplyIfSomethingSlippedThrough() {
-        guard method == .native, state != .all, Date.now.timeIntervalSince(lastReapply) > 2 else { return }
+        guard method == .native, Date.now.timeIntervalSince(lastReapply) > 2 else { return }
         let slipped: Bool
         if settings.hideAllApps {
-            slipped = state == .collapsed && items.contains { isLive($0) && isHiddenByHideAll($0) && !isOwn($0) }
+            if state == .collapsed {
+                slipped = items.contains { isLive($0) && isHiddenByHideAll($0) && !isOwn($0) }
+            } else {
+                slipped = items.contains { isLive($0) && isInHiddenSection($0) && !isTemporarilyShown($0) }
+            }
         } else {
+            guard state != .all else { return }
             let hiding: Set<MenuBarSection> = state == .collapsed ? [.hidden, .alwaysHidden] : [.alwaysHidden]
             slipped = items.contains {
                 isLive($0) && !$0.isNativeSystemItem && !$0.isOverflowed && !isOwn($0)
@@ -425,6 +465,7 @@ final class SectionManager: ObservableObject {
         if changed { onStateChange?(new) }
         Task { await rescanSoon() }
         if new == .collapsed {
+            temporarilyShown.removeAll()
             rehideTimer?.invalidate()
             stopWatchingCursor()
             if MenuBarGeometry.isInMenuBar(NSEvent.mouseLocation, margin: 6) { isHoverArmed = false }
@@ -448,14 +489,26 @@ final class SectionManager: ObservableObject {
             // Hide-all's allow-list never depends on where icons are, so act at once:
             // any scan here would sit between the cursor and the bar changing.
             if settings.hideAllApps {
-                guard target == .collapsed else {
+                var allowed = appleAgentBundles()
+                if let own = Bundle.main.bundleIdentifier { allowed.insert(own) }
+                if target == .collapsed {
+                    // Only Apple's items, Sleeve and the "Always" apps stay.
+                    allowed.formUnion(settings.alwaysShownBundles)
+                    await restrictNatively(to: allowed, generation: generation,
+                                           describing: "every app except \(allowed.sorted())")
+                    return
+                }
+                // Revealed: everything except the hidden section (apps the user keeps
+                // out of the bar), less any of those opened from the section just now.
+                let hiddenSection = Set(settings.hiddenSectionBundles).subtracting(temporarilyShown)
+                guard !hiddenSection.isEmpty else {
                     releaseRestriction()
                     return
                 }
-                var allowed = Set(settings.alwaysShownBundles).union(appleAgentBundles())
-                if let own = Bundle.main.bundleIdentifier { allowed.insert(own) }
+                allowed.formUnion(items.compactMap(\.bundleID))
+                allowed.subtract(hiddenSection)
                 await restrictNatively(to: allowed, generation: generation,
-                                       describing: "every app except \(allowed.sorted())")
+                                       describing: "the hidden section: \(hiddenSection.sorted())")
                 return
             }
 
@@ -653,6 +706,9 @@ final class SectionManager: ObservableObject {
 
     /// Opens a status item's menu, even if it is currently hidden.
     func activate(_ item: MenuBarItem) async {
+        if settings.hideAllApps && method == .native {
+            return await activateFromHiddenSection(item)
+        }
         let section = self.section(of: item)
         let needed: RevealState = section == .alwaysHidden ? .all : (section == .hidden ? .hidden : state)
 
@@ -684,6 +740,29 @@ final class SectionManager: ObservableObject {
         if method != .cover { scheduleRehide() }
     }
 
+    /// Hide-all: an app kept in the hidden section is let into the bar until the next
+    /// hide, then pressed; one macOS overflowed is pressed where it is, or failing that
+    /// through macOS's own "Show Hidden Menu Bar Items" button.
+    private func activateFromHiddenSection(_ item: MenuBarItem) async {
+        if let bundle = item.bundleID, isInHiddenSection(item) {
+            temporarilyShown.insert(bundle)
+        }
+        apply(.all, force: true)
+        scheduleRehide()
+        for _ in 0..<20 where !isLive(item) {
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+        await rescanSoon(after: 250)
+        let fresh = items.first { $0.id == item.id } ?? item
+        if fresh.isOverflowed {
+            if !fresh.element.press() { MenuBarScanner.overflowButton()?.press() }
+            return
+        }
+        if !fresh.element.press() {
+            ItemMover.click(at: CGPoint(x: fresh.frame.midX, y: fresh.frame.midY))
+        }
+    }
+
     // MARK: - Toggle button
 
     @objc private func toggleClicked(_ sender: NSStatusBarButton) {
@@ -703,7 +782,7 @@ final class SectionManager: ObservableObject {
             showHowToHide()
             return
         }
-        if settings.useSleeveBar {
+        if settings.useSleeveBar && !settings.hideAllApps {
             onToggleClickedForBar?()
         } else {
             toggle()
@@ -728,10 +807,11 @@ final class SectionManager: ObservableObject {
     /// Reveal the way the user's settings ask for: everything in hide-all mode, the
     /// Sleeve Bar if that's the reveal style, otherwise the Hidden section in place.
     func revealForUser() {
-        if settings.useSleeveBar {
-            onHoverRevealForBar?()
-        } else if settings.hideAllApps {
+        if settings.hideAllApps {
+            // Hide-all shows apps in the bar itself; the drawer is the hidden section.
             reveal(.all)
+        } else if settings.useSleeveBar {
+            onHoverRevealForBar?()
         } else {
             reveal(.hidden)
         }

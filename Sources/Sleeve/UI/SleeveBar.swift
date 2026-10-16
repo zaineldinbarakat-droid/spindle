@@ -99,8 +99,8 @@ final class SleeveBarController {
     private func refreshItems() {
         var list: [MenuBarItem]
         if SleeveSettings.shared.hideAllApps {
-            // Every app hide-all keeps out of the bar, one button per icon.
-            list = sections.items.filter { sections.isHiddenByHideAll($0) }
+            // The hidden section: apps kept out of the bar, and any that didn't fit.
+            list = sections.hiddenSectionItems
         } else {
             list = sections.items(in: .hidden)
             if model.includeAlwaysHidden { list += sections.items(in: .alwaysHidden) }
@@ -172,9 +172,11 @@ struct SleeveBarView: View {
     var body: some View {
         HStack(spacing: 2) {
             if model.items.isEmpty {
-                Text(AXIsProcessTrusted()
-                     ? "No hidden icons — ⌘-drag icons left of the Sleeve divider to hide them."
-                     : "Allow Sleeve in Privacy & Security → Accessibility.")
+                Text(!AXIsProcessTrusted()
+                     ? "Allow Sleeve in Privacy & Security → Accessibility."
+                     : (SleeveSettings.shared.hideAllApps
+                        ? "Nothing hidden. Set an app to “Hidden” in Settings → Layout; apps that don't fit in the menu bar show up here too."
+                        : "No hidden icons — ⌘-drag icons left of the Sleeve divider to hide them."))
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 12)

@@ -128,15 +128,16 @@ private struct GeneralTab: View {
             }
             Section("What to hide") {
                 Toggle("Hide all app icons until I hover over the menu bar", isOn: $settings.hideAllApps)
-                Picker("Show hidden apps", selection: $settings.useSleeveBar) {
-                    Text("In a drawer below the bar").tag(true)
-                    Text("Right in the menu bar").tag(false)
+                if !settings.hideAllApps {
+                    Picker("Show hidden icons", selection: $settings.useSleeveBar) {
+                        Text("In a drawer below the bar").tag(true)
+                        Text("Right in the menu bar").tag(false)
+                    }
+                    .pickerStyle(.radioGroup)
+                } else {
+                    Text("Apps set to “Hidden” in Layout — and any that don't fit in the menu bar — wait in the hidden section: two-finger click the menu bar, then Show Hidden Apps.")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
-                .pickerStyle(.radioGroup)
-                Text(settings.useSleeveBar
-                     ? "Nothing in the menu bar moves: your apps appear in a drawer just under it."
-                     : "Your apps appear in the menu bar itself. macOS rearranges the bar to fit them, so other icons shift while they show.")
-                    .font(.caption).foregroundStyle(.secondary)
                 Text(settings.hideAllApps
                      ? "Like Ice: the bar shows only Sleeve and Apple's own icons until the cursor reaches the right side of the menu bar. Pick apps to always keep visible under Layout."
                      : "Only icons you ⌘-drag into the Hidden sections are hidden.")
@@ -425,19 +426,22 @@ private struct AlwaysShownList: View {
         Form {
             Section {
                 ForEach(apps) { item in
-                    Toggle(isOn: Binding(
-                        get: { settings.alwaysShownBundles.contains(item.bundleID ?? "") },
-                        set: { keep in
-                            guard let bundle = item.bundleID else { return }
-                            if keep { settings.alwaysShownBundles.append(bundle) }
-                            else { settings.alwaysShownBundles.removeAll { $0 == bundle } }
-                        })) {
+                    if let bundle = item.bundleID {
                         HStack(spacing: 8) {
                             Image(nsImage: item.icon)
                                 .resizable()
                                 .aspectRatio(contentMode: .fit)
                                 .frame(width: 18, height: 18)
                             Text(item.ownerName)
+                            Spacer()
+                            Picker("", selection: Binding(
+                                get: { settings.placement(of: bundle) },
+                                set: { settings.setPlacement($0, for: bundle) })) {
+                                ForEach(SleeveSettings.AppPlacement.allCases) { Text($0.title).tag($0) }
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.segmented)
+                            .fixedSize()
                         }
                     }
                 }
@@ -446,9 +450,9 @@ private struct AlwaysShownList: View {
                         .foregroundStyle(.secondary)
                 }
             } header: {
-                Text("Always show")
+                Text("Where each app's icon goes")
             } footer: {
-                Text("Everything else is hidden until you hover over the menu bar. Apple's own icons (clock, Wi-Fi, battery…) always stay.")
+                Text("Always: never hidden. On Hover: appears when you hover over the menu bar, hides when you move away. Hidden: never in the menu bar — it waits in the hidden section (two-finger click the bar → Show Hidden Apps), along with any app that doesn't fit. Apple's own icons always stay.")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
