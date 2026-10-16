@@ -1,5 +1,5 @@
 {
-  "version": "0.3.7",
-  "notes": "Clearer wording in Sleeve's settings for the two-finger click menu.",
+  "version": "0.3.8",
+  "notes": "Sleeve: the icon now stays in one fixed place as apps appear and disappear; friendlier menu bar color settings with a live preview, palettes, swatches, direction arrows and an Album mode that follows Spindle's song.",
   "minimumSystemVersion": "14.0"
 }

@@ -83,6 +83,10 @@ of the screen.
 - **Two-finger click** anywhere on the menu bar (not on another app's icon) for Sleeve's
   options: Show Hidden Apps, show/hide the menu bar apps, search, Zen mode, menu bar
   color, settings and updates.
+- **An icon that never moves.** macOS 27 shuffles status items as apps come and go and
+  won't let an app choose its spot, so Sleeve draws its icon in a small window of its
+  own at a fixed place — the left end of where your apps appear, clear of the notch and
+  Spindle — and its real status item shrinks to an invisible placeholder.
 - **An icon with two faces,** like Ice's image sets, always in the bar: an outlined eye
   while your apps are tucked away; hover it and it morphs into the filled eye with a
   little bounce as they come out, and morphs back when you move away. Or dot, ellipsis,
@@ -96,9 +100,11 @@ of the screen.
 - **Auto-rehide** when the cursor leaves the menu bar (never while a menu is open), after
   a delay, or never.
 - **Menu bar color, the Ice way.** A light tint laid over the whole menu bar — edge to
-  edge, flush with the top of the screen, notch and all — at an adjustable intensity
-  (20% by default, Ice's own strength), so icons and menus show through tinted.
-  Solid tints or multi-stop gradients (add, drag and recolour stops, set
+  edge, flush with the top of the screen, notch and all — at an adjustable strength
+  (20% by default, Ice's own), so icons and menus show through tinted. A live preview,
+  one-click looks, solid colours from swatches, **Album** (follows the song playing in
+  Spindle), or gradients built from palettes or by hand: add, drag, recolour and space
+  stops evenly, point them any direction; or multi-stop gradients (add, drag and recolour stops, set
   any angle; Sunset, Aurora, Ice and Neon presets), Full / Rounded / Split-capsule shapes, shadows and
   borders, with a separate Dark Mode style and per-display overrides.
 - **Spacing.** A slider for icon spacing (applied by restarting the apps that own icons).
