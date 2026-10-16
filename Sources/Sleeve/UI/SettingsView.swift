@@ -146,9 +146,9 @@ private struct GeneralTab: View {
             Section("Icon style") {
                 IconStylePicker()
                 Toggle("Reveal when hovering over Sleeve's icon", isOn: $settings.revealOnIconHover)
-                Toggle("Two-finger click the empty menu bar to show or hide apps", isOn: $settings.revealOnTwoFingerClick)
+                Toggle("Two-finger click the menu bar for Sleeve's menu (Show Hidden Apps and more)", isOn: $settings.revealOnTwoFingerClick)
 
-                Text("Hover or click Sleeve's icon to show your apps · two-finger click it for options (Zen mode, search, menu bar color…). Tip: ⌘-drag Sleeve's icon next to the clock, so revealed apps appear to its left and it stays put under your cursor.")
+                Text("Hover or click Sleeve's icon to show your apps · two-finger click the menu bar for Show Hidden Apps, Zen mode, search, menu bar color… Tip: ⌘-drag Sleeve's icon next to the clock, so revealed apps appear to its left and it stays put under your cursor.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             if SectionManager.isModernMenuBar {

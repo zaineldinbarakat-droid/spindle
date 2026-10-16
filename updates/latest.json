@@ -1,5 +1,5 @@
 {
-  "version": "0.3.6",
-  "notes": "Sleeve: apps appear in the menu bar on hover again; new hidden section for apps you choose to keep out of the bar and apps that don't fit (two-finger click the bar → Show Hidden Apps); per-app Always / On Hover / Hidden in Settings → Layout.",
+  "version": "0.3.7",
+  "notes": "Clearer wording in Sleeve's settings for the two-finger click menu.",
   "minimumSystemVersion": "14.0"
 }
