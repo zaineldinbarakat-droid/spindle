@@ -12,30 +12,95 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
-            Section("Appearance") {
-                Picker("Show the song as", selection: $artworkStyle) {
-                    ForEach(ArtworkStyle.allCases) { style in
-                        Text(style.title).tag(style)
-                    }
-                }
-                .pickerStyle(.segmented)
-
-                Picker("Notch look", selection: $notch.style) {
+            Section {
+                Picker("Look", selection: $notch.style) {
                     ForEach(NotchViewModel.Style.allCases) { style in
                         Text(style.title).tag(style)
                             .disabled(style == .liquidGlass && !NotchViewModel.Style.isGlassAvailable)
                     }
                 }
                 .pickerStyle(.segmented)
+                Text(lookDescription)
+                    .font(.caption).foregroundStyle(.secondary)
                 if notch.style == .songColor {
-                    Toggle("Let the album color reach into the notch", isOn: $notch.tintNotch)
+                    Toggle("Let the album color reach into the notch itself", isOn: $notch.tintNotch)
                 }
-                Picker("Collapsed notch shows", selection: $notch.collapsedShowsCover) {
+                if notch.style == .liquidGlass {
+                    LabeledContent("Clarity") {
+                        HStack {
+                            Text("Frosted").font(.caption).foregroundStyle(.secondary)
+                            Slider(value: $notch.glassClarity, in: 0...1)
+                            Text("Clear").font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    Toggle("Tint the glass with the album's color", isOn: $notch.glassTinted)
+                }
+                Picker("When closed, show", selection: $notch.collapsedShowsCover) {
                     Text("Album Cover").tag(true)
                     Text("Spinning Record").tag(false)
                 }
                 .pickerStyle(.segmented)
+                Picker("When open, show the song as", selection: $artworkStyle) {
+                    ForEach(ArtworkStyle.allCases) { style in
+                        Text(style.title).tag(style)
+                    }
+                }
+                .pickerStyle(.segmented)
+                Toggle("Open when the cursor reaches the notch", isOn: $notch.openOnHover)
+            } header: {
+                Text("Notch")
+            }
 
+            Section {
+                Toggle("Show the playing indicator", isOn: $notch.showVisualizer)
+                if notch.showVisualizer {
+                    HStack {
+                        Spacer()
+                        // Live preview on a slice of black notch, always "playing".
+                        RadianceView(isPlaying: true,
+                                     color: notch.indicatorColor(accent: player.accent),
+                                     style: notch.indicatorStyle,
+                                     brightness: notch.indicatorBrightness,
+                                     glow: notch.indicatorGlow)
+                            .scaleEffect(1.6)
+                            .frame(width: 120, height: 44)
+                            .background(Capsule().fill(Color.black))
+                        Spacer()
+                    }
+                    Picker("Style", selection: $notch.indicatorStyle) {
+                        ForEach(NotchViewModel.IndicatorStyle.allCases) { Text($0.title).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    Picker("Color", selection: $notch.indicatorColorMode) {
+                        ForEach(NotchViewModel.IndicatorColor.allCases) { Text($0.title).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    if notch.indicatorColorMode == .custom {
+                        ColorPicker("Custom color", selection: $notch.indicatorCustomColor, supportsOpacity: false)
+                    }
+                    LabeledContent("Brightness") {
+                        HStack {
+                            Text("Soft").font(.caption).foregroundStyle(.secondary)
+                            Slider(value: $notch.indicatorBrightness, in: 0.3...1)
+                            Text("Bright").font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    LabeledContent("Glow") {
+                        HStack {
+                            Text("None").font(.caption).foregroundStyle(.secondary)
+                            Slider(value: $notch.indicatorGlow, in: 0...1)
+                            Text("Strong").font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            } header: {
+                Text("Playing indicator")
+            } footer: {
+                Text("The little glow on the right of the closed notch while music plays.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+
+            Section("General") {
                 Picker("Desktop wallpaper", selection: Binding(
                     get: { desktop.isBackdropVisible },
                     set: { desktop.setBackdrop(visible: $0) }
@@ -44,11 +109,6 @@ struct SettingsView: View {
                     Text("Retro turntable").tag(true)
                 }
                 .pickerStyle(.segmented)
-            }
-
-            Section("Behaviour") {
-                Toggle("Open when the cursor reaches the notch", isOn: $notch.openOnHover)
-                Toggle("Show the glowing playing indicator in the collapsed notch", isOn: $notch.showVisualizer)
                 Toggle("Launch at login", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, enabled in
                         // Re-read: registration can fail (e.g. quarantined app).
@@ -141,6 +201,14 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 460, height: 640)
+        .frame(width: 480, height: 700)
+    }
+
+    private var lookDescription: String {
+        switch notch.style {
+        case .black: return "Pure black, one with the hardware notch."
+        case .songColor: return "The open panel takes on the album's color; the notch itself stays black unless you allow it below."
+        case .liquidGlass: return "macOS's Liquid Glass, tinted with the album's color."
+        }
     }
 }

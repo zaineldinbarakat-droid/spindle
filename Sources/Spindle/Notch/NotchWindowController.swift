@@ -106,6 +106,7 @@ final class NotchWindowController {
         let pillVisible = !viewModel.isZenHidden && (player.snapshot.hasTrack || timer.isActive || viewModel.isExpanded)
         let state = SpindleState(pillFrame: pillVisible ? metrics.hoverZone() : .zero,
                                  hoverZone: viewModel.openOnHover ? metrics.hoverZone() : .zero,
+                                 panelFrame: viewModel.isExpanded ? metrics.liveZone() : .zero,
                                  isExpanded: viewModel.isExpanded,
                                  isZenHidden: viewModel.isZenHidden)
         SyncChannel.post(SyncChannel.spindleState, state.userInfo)

@@ -45,11 +45,20 @@ final class SpindleBridge: ObservableObject {
         SyncChannel.post(SyncChannel.requestSpindleState)
     }
 
-    /// True if `point` is somewhere Spindle handles itself.
+    /// True if `point` is somewhere Spindle handles itself: its notch pill, the zone
+    /// that opens it, or — while open — the whole panel. A margin keeps the two apps
+    /// from both reacting when the cursor brushes the boundary.
     func owns(_ point: CGPoint) -> Bool {
         guard let state, SleeveSettings.shared.avoidSpindle else { return false }
-        return state.hoverZone.insetBy(dx: -4, dy: -4).contains(point)
-            || state.pillFrame.insetBy(dx: -4, dy: -4).contains(point)
+        // Inclusive of the very top edge, where the cursor reports y == screen maxY.
+        func inside(_ rect: CGRect, margin: CGFloat) -> Bool {
+            guard !rect.isEmpty else { return false }
+            let r = rect.insetBy(dx: -margin, dy: -margin)
+            return point.x >= r.minX && point.x <= r.maxX && point.y >= r.minY && point.y <= r.maxY + 8
+        }
+        return inside(state.hoverZone, margin: 10)
+            || inside(state.pillFrame, margin: 10)
+            || inside(state.panelFrame, margin: 6)
     }
 
     func sleeveBarChanged(open: Bool) {

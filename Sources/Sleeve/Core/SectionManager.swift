@@ -64,6 +64,7 @@ final class SectionManager: ObservableObject {
         didSet {
             updateSectionCache()
             reapplyIfSomethingSlippedThrough()
+            offerPlacementTipIfNeeded()
         }
     }
     /// Set by automation rules; holds the reveal open regardless of auto-rehide.
@@ -770,6 +771,40 @@ final class SectionManager: ObservableObject {
     }
 
     private var hintPopover: NSPopover?
+
+    // MARK: - Keeping the icon still
+
+    /// When apps sit to the *right* of Sleeve's icon, revealing them pushes the icon
+    /// left and hiding pulls it back — it jumps around under the cursor. macOS 27
+    /// won't let an app choose its own position (preferred positions are ignored and
+    /// synthesized ⌘-drags rejected), so the fix is one ⌘-drag by the user; this
+    /// explains that, once, the first time the situation is seen.
+    var hasAppsRightOfIcon: Bool {
+        guard state != .collapsed, let icon = toggleFrame else { return false }
+        return items.contains { item in
+            isLive(item) && !item.isOverflowed && !item.isNativeSystemItem && !isOwn(item)
+                && item.frame.minX > icon.maxX
+        }
+    }
+
+    private func offerPlacementTipIfNeeded() {
+        guard hasAppsRightOfIcon,
+              !UserDefaults.standard.bool(forKey: "didShowPlacementTip"),
+              hintPopover?.isShown != true else { return }
+        UserDefaults.standard.set(true, forKey: "didShowPlacementTip")
+        showPlacementTip()
+    }
+
+    func showPlacementTip() {
+        guard let button = toggleItem.button else { return }
+        let popover = NSPopover()
+        popover.behavior = .transient
+        popover.contentViewController = NSHostingController(rootView: PlacementTipView(close: { [weak self] in
+            self?.hintPopover?.close()
+        }))
+        hintPopover = popover
+        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+    }
 
     private func showHowToHide() {
         guard let button = toggleItem.button else { return }

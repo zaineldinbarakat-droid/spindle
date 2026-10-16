@@ -38,7 +38,25 @@ enum Theme {
     }
 }
 
+/// How content arrives and leaves inside the island, the way the Dynamic Island's
+/// does: it resolves out of a blur while growing a touch from the top, rather than
+/// popping in or merely fading.
+struct IslandContent: ViewModifier {
+    var progress: Double
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(progress)
+            .blur(radius: (1 - progress) * 8)
+            .scaleEffect(0.94 + 0.06 * progress, anchor: .top)
+    }
+}
+
 extension AnyTransition {
+    static var islandContentIn: AnyTransition {
+        .modifier(active: IslandContent(progress: 0), identity: IslandContent(progress: 1))
+    }
+
     static var notchReveal: AnyTransition {
         .asymmetric(
             insertion: .opacity.combined(with: .scale(scale: 0.94, anchor: .top)),
@@ -48,13 +66,12 @@ extension AnyTransition {
 }
 
 extension Animation {
-    /// Opening: the shape grows out of the notch and settles without a wobble, so it
-    /// feels attached to the hardware. `.smooth` is a spring with no bounce whose
-    /// velocity carries over if it's interrupted mid-flight, so a quick in-and-out of
-    /// the cursor never snaps.
-    static var notch: Animation { .smooth(duration: 0.42) }
-    /// Closing is a touch quicker than opening; things should get out of the way fast.
-    static var notchClose: Animation { .smooth(duration: 0.32) }
+    /// Opening, after the Dynamic Island: the shape springs out of the notch and
+    /// settles with the slightest overshoot — enough to feel physical, not bouncy. A
+    /// spring keeps its velocity if interrupted, so a quick in-and-out never snaps.
+    static var notch: Animation { .spring(duration: 0.5, bounce: 0.2) }
+    /// Closing is quicker and doesn't overshoot: it tucks back into the hardware.
+    static var notchClose: Animation { .spring(duration: 0.38, bounce: 0.04) }
     static var notchQuick: Animation { .spring(response: 0.22, dampingFraction: 0.9) }
 }
 

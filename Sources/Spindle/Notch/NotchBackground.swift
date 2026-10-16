@@ -32,18 +32,9 @@ struct NotchBackground: View {
     private var fill: some View {
         switch viewModel.style {
         case .black:
-            shape
-                .fill(Theme.panel)
-                .overlay(
-                    // Cover art glowing faintly into the panel, below the notch strip.
-                    shape.fill(
-                        RadialGradient(colors: [player.accent.opacity(isExpanded ? 0.18 : 0), .clear],
-                                       center: .init(x: 0.2, y: 0.6),
-                                       startRadius: 10,
-                                       endRadius: 280)
-                    )
-                    .mask(belowNotchMask)
-                )
+            // Black means black: no album colour anywhere, so it stays one with the
+            // hardware notch. (The colour lives in the playing indicator instead.)
+            shape.fill(Theme.panel)
 
         case .songColor where viewModel.tintNotch:
             // Opted in: the colour reaches right up into the notch.
@@ -88,11 +79,9 @@ struct NotchBackground: View {
 
         case .liquidGlass:
             if #available(macOS 26, *) {
-                Color.clear
-                    .glassEffect(.regular.tint(player.accent.opacity(0.32)), in: shape)
-                    // Glass over a bright desktop would wash out white text; a thin
-                    // dark scrim keeps it readable without losing the refraction.
-                    .overlay(shape.fill(Color.black.opacity(isExpanded ? 0.28 : 0.45)))
+                LiquidGlassFill(shape: shape,
+                                clarity: viewModel.glassClarity,
+                                tint: viewModel.glassTinted ? player.accent : nil)
             } else {
                 shape.fill(Theme.panel)
             }
@@ -122,4 +111,44 @@ extension Color {
         let base = NSColor(self).usingColorSpace(.sRGB) ?? .black
         return Color(nsColor: base.blended(withFraction: fraction, of: .black) ?? base)
     }
+}
+
+/// Apple's Liquid Glass with a continuous clarity control.
+///
+/// The base is always Apple's *clear* glass — properly see-through, refracting what's
+/// behind it at the edges. Frosting is layered on top in proportion: a behind-window
+/// blur and a little dimming, both fading to nothing as clarity rises. One continuous
+/// slider, no jump between "regular" and "clear" halfway along.
+@available(macOS 26, *)
+struct LiquidGlassFill: View {
+    var shape: NotchShape
+    var clarity: Double
+    var tint: Color?
+
+    var body: some View {
+        let frost = 1 - min(max(clarity, 0), 1)
+        ZStack {
+            Color.clear
+                .glassEffect(.clear.tint(tint?.opacity(0.18 + 0.17 * frost)), in: shape)
+            BehindWindowBlur()
+                .mask(shape)
+                .opacity(frost * 0.95)
+            // A touch of dimming keeps white text readable over bright desktops.
+            shape.fill(Color.black.opacity(0.08 + 0.32 * frost))
+        }
+        .animation(.easeInOut(duration: 0.25), value: clarity)
+    }
+}
+
+/// The system's own frosted material, blurring whatever is behind the window.
+struct BehindWindowBlur: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = .hudWindow
+        view.blendingMode = .behindWindow
+        view.state = .active
+        return view
+    }
+
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
 }

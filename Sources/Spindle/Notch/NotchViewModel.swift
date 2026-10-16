@@ -59,6 +59,80 @@ final class NotchViewModel: ObservableObject {
     @Published var tintNotch: Bool = Defaults.bool(.tintNotch, default: false) {
         didSet { Defaults.set(.tintNotch, tintNotch) }
     }
+    // MARK: Liquid Glass
+
+    /// 0 = frosted (Apple's regular glass, blurred and dimmed for legibility) … 1 =
+    /// clear (Apple's clear glass: see-through, just refracting at the edges).
+    @Published var glassClarity: Double = Defaults.double(.glassClarity, default: 0.6) {
+        didSet { Defaults.set(.glassClarity, glassClarity) }
+    }
+    /// Tint the glass with the album's colour.
+    @Published var glassTinted: Bool = Defaults.bool(.glassTinted, default: true) {
+        didSet { Defaults.set(.glassTinted, glassTinted) }
+    }
+
+    // MARK: Playing indicator (the glow on the right of the collapsed notch)
+
+    enum IndicatorStyle: String, CaseIterable, Identifiable {
+        case bars, wave, pulse
+        var id: String { rawValue }
+        var title: String { rawValue.capitalized }
+    }
+
+    enum IndicatorColor: String, CaseIterable, Identifiable {
+        /// The cover's own colour, changing with every song.
+        case album
+        /// Monotone white.
+        case white
+        /// One colour of the user's choosing.
+        case custom
+        var id: String { rawValue }
+        var title: String {
+            switch self {
+            case .album: return "Album"
+            case .white: return "White"
+            case .custom: return "Custom"
+            }
+        }
+    }
+
+    @Published var indicatorStyle: IndicatorStyle = IndicatorStyle(rawValue: Defaults.string(.indicatorStyle) ?? "") ?? .bars {
+        didSet { Defaults.set(.indicatorStyle, indicatorStyle.rawValue) }
+    }
+    @Published var indicatorColorMode: IndicatorColor = IndicatorColor(rawValue: Defaults.string(.indicatorColorMode) ?? "") ?? .album {
+        didSet { Defaults.set(.indicatorColorMode, indicatorColorMode.rawValue) }
+    }
+    @Published var indicatorCustomColor: Color = NotchViewModel.loadColor(Defaults.string(.indicatorCustomColor)) {
+        didSet { Defaults.set(.indicatorCustomColor, NotchViewModel.saveColor(indicatorCustomColor)) }
+    }
+    /// 0.3 (soft) … 1 (bright).
+    @Published var indicatorBrightness: Double = Defaults.double(.indicatorBrightness, default: 0.85) {
+        didSet { Defaults.set(.indicatorBrightness, indicatorBrightness) }
+    }
+    /// 0 (no glow) … 1 (strong halo).
+    @Published var indicatorGlow: Double = Defaults.double(.indicatorGlow, default: 0.6) {
+        didSet { Defaults.set(.indicatorGlow, indicatorGlow) }
+    }
+
+    func indicatorColor(accent: Color) -> Color {
+        switch indicatorColorMode {
+        case .album: return accent
+        case .white: return .white
+        case .custom: return indicatorCustomColor
+        }
+    }
+
+    private static func loadColor(_ string: String?) -> Color {
+        let parts = (string ?? "").split(separator: ",").compactMap { Double($0) }
+        guard parts.count == 3 else { return Color(red: 0.55, green: 0.85, blue: 1.0) }
+        return Color(.sRGB, red: parts[0], green: parts[1], blue: parts[2])
+    }
+
+    private static func saveColor(_ color: Color) -> String {
+        let ns = NSColor(color).usingColorSpace(.sRGB) ?? .white
+        return "\(ns.redComponent),\(ns.greenComponent),\(ns.blueComponent)"
+    }
+
     /// The collapsed notch's left wing: the album cover (default) or the spinning record.
     @Published var collapsedShowsCover: Bool = Defaults.bool(.collapsedShowsCover, default: true) {
         didSet { Defaults.set(.collapsedShowsCover, collapsedShowsCover) }

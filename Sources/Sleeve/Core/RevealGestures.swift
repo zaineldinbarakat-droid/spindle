@@ -32,7 +32,9 @@ final class RevealGestures {
         monitors.append(NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDown) { [weak self] _ in
             Task { @MainActor in self?.clicked() }
         } as Any)
-        monitors.append(NSEvent.addGlobalMonitorForEvents(matching: .rightMouseDown) { [weak self] _ in
+        // On release, not press: a menu opened on the press is closed again by the
+        // release that follows a moment later — it flashed up and vanished.
+        monitors.append(NSEvent.addGlobalMonitorForEvents(matching: .rightMouseUp) { [weak self] _ in
             Task { @MainActor in self?.twoFingerClicked() }
         } as Any)
 

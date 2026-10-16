@@ -1,5 +1,5 @@
 {
-  "version": "0.3.3",
-  "notes": "Sleeve: its icon stays visible (install in Applications), hover works while any app is in front, two-finger click its icon for options. Spindle: smooth notch with no bump, album cover and a glowing playing indicator in the collapsed notch, optional album color in the notch.",
+  "version": "0.3.4",
+  "notes": "Spindle no longer crashes on play/pause/skip; Apple-style notch animation; Black notch is pure black; customizable playing indicator; Liquid Glass clarity slider. Sleeve stays out of Spindle's notch, two-finger click menu stays open, and a tip to keep its icon still.",
   "minimumSystemVersion": "14.0"
 }

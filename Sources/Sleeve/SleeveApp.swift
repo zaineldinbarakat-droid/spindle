@@ -120,6 +120,7 @@ final class SleeveAppDelegate: NSObject, NSApplicationDelegate {
             _ = add(env.sections.state == .all ? "Hide Always Hidden Apps" : "Show Everything") { env.sections.toggleAll() }
         }
         _ = add("Search Menu Bar…") { env.search.open() }
+        _ = add("Keep the Icon Still…") { env.sections.showPlacementTip() }
         menu.addItem(.separator())
         let hideAll = add("Hide All Apps Until Hover") { env.settings.hideAllApps.toggle() }
         hideAll.state = env.settings.hideAllApps ? .on : .off
