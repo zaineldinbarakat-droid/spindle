@@ -52,7 +52,24 @@ final class AppleScriptBridge: @unchecked Sendable {
     /// Synchronously evaluates `source`. Must not be called from the main thread for
     /// anything that can block (i.e. anything that talks to another process).
     func run(_ source: String, cacheKey: String? = nil) throws -> NSAppleEventDescriptor {
-        try queue.sync {
+        try queue.sync { try execute(source, cacheKey: cacheKey) }
+    }
+
+    /// Fire-and-forget: transport commands whose result we don't care about.
+    ///
+    /// Calls `execute` directly: it's already on the queue. Going through `run` meant
+    /// a `queue.sync` from inside the queue's own block, which libdispatch traps on —
+    /// Spindle crashed on play/pause, skip and scrub (four crash reports, all here).
+    func perform(_ source: String, cacheKey: String? = nil) {
+        queue.async { [weak self] in
+            _ = try? self?.execute(source, cacheKey: cacheKey)
+        }
+    }
+
+    /// The work itself. Only ever called on `queue`.
+    private func execute(_ source: String, cacheKey: String?) throws -> NSAppleEventDescriptor {
+        dispatchPrecondition(condition: .onQueue(queue))
+        do {
             let script: NSAppleScript
             if let key = cacheKey, let existing = compiled[key] {
                 script = existing
@@ -79,13 +96,6 @@ final class AppleScriptBridge: @unchecked Sendable {
                 throw PlayerError.scriptFailed(message)
             }
             return result
-        }
-    }
-
-    /// Fire-and-forget: transport commands whose result we don't care about.
-    func perform(_ source: String, cacheKey: String? = nil) {
-        queue.async { [weak self] in
-            _ = try? self?.run(source, cacheKey: cacheKey)
         }
     }
 

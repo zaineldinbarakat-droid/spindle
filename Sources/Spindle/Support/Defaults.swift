@@ -9,6 +9,13 @@ enum Defaults {
         case notchStyle
         case tintNotch
         case collapsedShowsCover
+        case indicatorStyle
+        case indicatorColorMode
+        case indicatorCustomColor
+        case indicatorBrightness
+        case indicatorGlow
+        case glassClarity
+        case glassTinted
 
         // Focus timer
         case focusMinutes
@@ -41,6 +48,15 @@ enum Defaults {
     }
 
     static func set(_ key: Key, _ value: Int) {
+        UserDefaults.standard.set(value, forKey: key.rawValue)
+    }
+
+    static func double(_ key: Key, default fallback: Double) -> Double {
+        guard UserDefaults.standard.object(forKey: key.rawValue) != nil else { return fallback }
+        return UserDefaults.standard.double(forKey: key.rawValue)
+    }
+
+    static func set(_ key: Key, _ value: Double) {
         UserDefaults.standard.set(value, forKey: key.rawValue)
     }
 

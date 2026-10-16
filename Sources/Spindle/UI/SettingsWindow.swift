@@ -21,7 +21,7 @@ enum SettingsWindow {
             .environmentObject(AppEnvironment.shared.desktop)
 
         let created = NSWindow(
-            contentRect: CGRect(x: 0, y: 0, width: 460, height: 640),
+            contentRect: CGRect(x: 0, y: 0, width: 480, height: 700),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
             defer: false

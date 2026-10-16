@@ -51,12 +51,17 @@ public struct SpindleState: Equatable {
     public var pillFrame: CGRect
     /// Where hovering opens Spindle's panel.
     public var hoverZone: CGRect
+    /// The open panel's area (zero while closed). Its top strip runs along the menu
+    /// bar, so Sleeve must stay out of it too.
+    public var panelFrame: CGRect
     public var isExpanded: Bool
     public var isZenHidden: Bool
 
-    public init(pillFrame: CGRect, hoverZone: CGRect, isExpanded: Bool, isZenHidden: Bool) {
+    public init(pillFrame: CGRect, hoverZone: CGRect, panelFrame: CGRect = .zero,
+                isExpanded: Bool, isZenHidden: Bool) {
         self.pillFrame = pillFrame
         self.hoverZone = hoverZone
+        self.panelFrame = panelFrame
         self.isExpanded = isExpanded
         self.isZenHidden = isZenHidden
     }
@@ -65,6 +70,7 @@ public struct SpindleState: Equatable {
         [
             "pill": NSStringFromRect(pillFrame),
             "hover": NSStringFromRect(hoverZone),
+            "panel": NSStringFromRect(panelFrame),
             "expanded": isExpanded,
             "zen": isZenHidden
         ]
@@ -75,6 +81,7 @@ public struct SpindleState: Equatable {
               let hover = userInfo["hover"] as? String else { return nil }
         pillFrame = NSRectFromString(pill)
         hoverZone = NSRectFromString(hover)
+        panelFrame = (userInfo["panel"] as? String).map(NSRectFromString) ?? .zero
         isExpanded = userInfo["expanded"] as? Bool ?? false
         isZenHidden = userInfo["zen"] as? Bool ?? false
     }

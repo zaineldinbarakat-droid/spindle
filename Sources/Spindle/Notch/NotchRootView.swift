@@ -50,15 +50,16 @@ struct NotchRootView: View {
                     expandedContent
                         .frame(width: expandedSize.width, height: expandedSize.height, alignment: .top)
                         .transition(.asymmetric(
-                            insertion: .opacity.animation(.easeOut(duration: 0.22).delay(0.08)),
-                            removal: .opacity.animation(.easeIn(duration: 0.1))
+                            // Resolves out of a blur just behind the growing shape.
+                            insertion: .islandContentIn.animation(.spring(duration: 0.42, bounce: 0.08).delay(0.06)),
+                            removal: .islandContentIn.animation(.easeIn(duration: 0.12))
                         ))
                 } else {
                     collapsedContent
                         .frame(width: collapsedSize.width, height: collapsedSize.height)
                         .transition(.asymmetric(
-                            insertion: .opacity.animation(.easeOut(duration: 0.2).delay(0.12)),
-                            removal: .opacity.animation(.easeIn(duration: 0.08))
+                            insertion: .islandContentIn.animation(.spring(duration: 0.35, bounce: 0).delay(0.14)),
+                            removal: .islandContentIn.animation(.easeIn(duration: 0.08))
                         ))
                 }
             }
@@ -98,7 +99,11 @@ struct NotchRootView: View {
                 if timer.isActive {
                     CollapsedCountdown()
                 } else if viewModel.showVisualizer {
-                    RadianceView(isPlaying: player.snapshot.isPlaying, accent: player.accent)
+                    RadianceView(isPlaying: player.snapshot.isPlaying,
+                                 color: viewModel.indicatorColor(accent: player.accent),
+                                 style: viewModel.indicatorStyle,
+                                 brightness: viewModel.indicatorBrightness,
+                                 glow: viewModel.indicatorGlow)
                 }
             }
             .padding(.trailing, Theme.notchCornerRadius + 2)
@@ -260,8 +265,7 @@ private struct TabSwitcher: View {
     }
 }
 
-/// The album cover in the collapsed notch's left wing: small, rounded, crisp, with a
-/// faint rim of its own colour so it sits on the black like a lit tile.
+/// The album cover in the collapsed notch's left wing: small, rounded and crisp.
 private struct CollapsedCover: View {
     var size: CGFloat
     @EnvironmentObject private var player: PlayerManager
@@ -284,7 +288,8 @@ private struct CollapsedCover: View {
         }
         .frame(width: size, height: size)
         .clipShape(shape)
-        .overlay(shape.strokeBorder(player.accent.opacity(0.45), lineWidth: 0.75))
+        // A neutral hairline: the album's colour stays out of the notch.
+        .overlay(shape.strokeBorder(Color.white.opacity(0.12), lineWidth: 0.75))
         .animation(.easeOut(duration: 0.35), value: player.artwork)
     }
 }

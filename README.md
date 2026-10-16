@@ -37,8 +37,14 @@ Built and verified against a MacBook Pro `Mac17,2` on macOS 27.0.
   room, film grain, big serif type) drawn behind your desktop icons. Off by default;
   *Desktop Wallpaper → My Wallpaper* puts yours back.
 - **Collapsed notch.** The album cover on the left and, on the right, a glowing
-  "now playing" indicator in the cover's colour that breathes while music plays and
-  settles when it's paused (or the spinning record, if you prefer).
+  "now playing" indicator that moves while music plays and settles when it's paused.
+  Pick its style (bars, wave or pulse), its colour (the album's, white, or any colour),
+  and how bright and how glowy it is — with a live preview in Settings.
+- **Feels like Apple made it.** The notch springs open like the Dynamic Island, with
+  the slightest settle, and its content resolves out of a blur rather than popping in;
+  its sides flare smoothly out of the hardware notch.
+- **Liquid Glass with a Clarity slider**, from frosted to properly see-through (Apple's
+  clear glass), optionally tinted with the album's colour.
 - **Notch look.** *Song Color* (the default) washes the open panel in a deep tint of
   the cover's dominant colour, cross-fading when the song changes, while the notch
   itself stays hardware-black — or let the colour reach into the notch too; *Black*
