@@ -1,5 +1,5 @@
 {
-  "version": "0.3.5",
-  "notes": "Spindle: smoother notch, pure black that matches the hardware notch, centred cover, one-tap 25/5 | 50/10, real Liquid Glass at Clear. Sleeve: hidden apps open in a drawer under the menu bar, so nothing slides.",
+  "version": "0.3.6",
+  "notes": "Sleeve: apps appear in the menu bar on hover again; new hidden section for apps you choose to keep out of the bar and apps that don't fit (two-finger click the bar → Show Hidden Apps); per-app Always / On Hover / Hidden in Settings → Layout.",
   "minimumSystemVersion": "14.0"
 }

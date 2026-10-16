@@ -68,15 +68,21 @@ Ice/Bartender, built to sit next to Spindle without the two ever fighting over t
 of the screen.
 
 - **Hide all apps until hover (default).** Like Ice: the menu bar shows only Sleeve and
-  Apple's own icons. Hover over Sleeve's icon (or the right side of the bar) and every
-  app icon comes back; move away and they tuck away again. Pick apps to always keep
-  visible under *Settings → Layout*.
+  Apple's own icons. Hover over Sleeve's icon (or the right side of the bar) and your
+  apps appear right in the menu bar; move away and they tuck away again.
+- **Per-app placement.** In *Settings → Layout* each app is *Always* (never hidden),
+  *On Hover* (the default) or *Hidden*.
+- **The hidden section.** Apps set to *Hidden* never appear in the menu bar, not even
+  on hover. They wait — together with any app macOS couldn't fit in a full bar — in a
+  drawer under the menu bar: two-finger click the bar, then **Show Hidden Apps**.
+  Clicking one there brings its icon into the bar and opens its menu.
 - **Instant and steady.** Revealing on hover and hiding when the cursor leaves the menu
   bar have no delay (measured on macOS 27: ~100 ms to show, ~70 ms to hide, including
   macOS redrawing the bar), with a little spatial slack so resting on the bar's edge
   never flickers. An open menu holds things in place.
-- **Two-finger click** Sleeve's icon for its options (show hidden apps, Zen mode,
-  search, menu bar color, settings…), or the empty bar to show or hide your apps.
+- **Two-finger click** anywhere on the menu bar (not on another app's icon) for Sleeve's
+  options: Show Hidden Apps, show/hide the menu bar apps, search, Zen mode, menu bar
+  color, settings and updates.
 - **An icon with two faces,** like Ice's image sets, always in the bar: an outlined eye
   while your apps are tucked away; hover it and it morphs into the filled eye with a
   little bounce as they come out, and morphs back when you move away. Or dot, ellipsis,
@@ -89,9 +95,6 @@ of the screen.
   an empty stretch of the bar, scrolling/swiping on the bar, or a hotkey.
 - **Auto-rehide** when the cursor leaves the menu bar (never while a menu is open), after
   a delay, or never.
-- **The drawer (default).** Hovering shows your hidden apps in a drawer just under the
-  menu bar, like Ice's Ice Bar, so nothing in the bar moves — Sleeve's icon included.
-  Click one and its real menu opens. Prefer them in the bar itself? One switch.
 - **Menu bar color, the Ice way.** A light tint laid over the whole menu bar — edge to
   edge, flush with the top of the screen, notch and all — at an adjustable intensity
   (20% by default, Ice's own strength), so icons and menus show through tinted.
