@@ -248,7 +248,7 @@ final class NotchWindowController {
         guard closeWorkItem == nil else { return }
         // Never close in the first moments after opening: the panel is still growing
         // under the cursor, and a quick graze shouldn't snap it shut mid-animation.
-        let minimumOpen = max(0.35 - Date.now.timeIntervalSince(openedAt), 0)
+        let minimumOpen = max(0.25 - Date.now.timeIntervalSince(openedAt), 0)
         let item = DispatchWorkItem { [weak self] in
             guard let self else { return }
             self.closeWorkItem = nil
@@ -258,7 +258,8 @@ final class NotchWindowController {
             self.viewModel.collapse()
         }
         closeWorkItem = item
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25 + minimumOpen, execute: item)
+        // A short grace, just enough to forgive the cursor slipping off the edge.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08 + minimumOpen, execute: item)
     }
 
     // MARK: - Teardown

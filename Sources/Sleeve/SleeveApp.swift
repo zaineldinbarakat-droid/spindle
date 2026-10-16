@@ -48,6 +48,7 @@ final class SleeveAppDelegate: NSObject, NSApplicationDelegate {
             env.sections.onToggleClickedForBar = { env.bar.toggle() }
             env.sections.onHoverRevealForBar = { env.bar.open() }
             env.sections.onCloseBar = { env.bar.close() }
+            env.sections.isSpindleArea = { env.spindle.owns($0) }
             env.gestures.showBar = { env.bar.open() }
             env.gestures.hideBar = { env.bar.close() }
             // One dropdown at a time.
@@ -127,7 +128,7 @@ final class SleeveAppDelegate: NSObject, NSApplicationDelegate {
             _ = add(env.sections.state == .all ? "Hide Always Hidden Apps" : "Show Everything") { env.sections.toggleAll() }
         }
         _ = add("Search Menu Bar…") { env.search.open() }
-        _ = add("Keep the Icon Still…") { env.sections.showPlacementTip() }
+        _ = add("Where Sleeve's Icon Sits…") { env.sections.showPlacementTip() }
         menu.addItem(.separator())
         let hideAll = add("Hide All Apps Until Hover") { env.settings.hideAllApps.toggle() }
         hideAll.state = env.settings.hideAllApps ? .on : .off

@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import SpindleSync
 import SwiftUI
 
 enum MenuBarSection: String, CaseIterable, Identifiable {
@@ -65,7 +66,6 @@ final class SectionManager: ObservableObject {
             updateSectionCache()
             rememberOverflow()
             reapplyIfSomethingSlippedThrough()
-            offerPlacementTipIfNeeded()
         }
     }
     /// Set by automation rules; holds the reveal open regardless of auto-rehide.
@@ -155,6 +155,7 @@ final class SectionManager: ObservableObject {
         }.store(in: &cancellables)
         // Sleeve's icon is always in the bar.
         toggleItem.isVisible = true
+        updateDividerPresence()
         settings.$fixedIcon.sink { [weak self] _ in
             DispatchQueue.main.async { self?.updateIconHome() }
         }.store(in: &cancellables)
@@ -171,10 +172,16 @@ final class SectionManager: ObservableObject {
             .sink { [weak self] _ in
             DispatchQueue.main.async {
                 guard let self else { return }
+                self.updateDividerPresence()
                 self.releaseRestriction()
                 self.apply(self.state, force: true)
             }
         }.store(in: &cancellables)
+
+        // Spindle is about to add its icon: let it land beside the other apps.
+        SyncChannel.observe(SyncChannel.spindleAddingIcon) { [weak self] _ in
+            Task { @MainActor in self?.holdRevealed(for: 3) }
+        }
 
         // Positions move whenever apps launch, quit or resize their items.
         rescanTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in
@@ -477,13 +484,31 @@ final class SectionManager: ObservableObject {
             if MenuBarGeometry.isInMenuBar(NSEvent.mouseLocation, margin: 6) { isHoverArmed = false }
         } else if changed {
             revealedAt = .now
+            // Judge where the icon sits once the bar has settled and been re-read:
+            // just after a reveal, hidden apps still report where they used to be.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+                Task { @MainActor in
+                    // Not during a reveal Sleeve made itself (Spindle adding its icon).
+                    guard let self, self.state != .collapsed, Date.now >= self.holdOpenUntil else { return }
+                    await self.rescanSoon()
+                    if self.state != .collapsed { self.offerPlacementTipIfNeeded() }
+                }
+            }
         }
     }
 
     /// Hide-all doesn't use sections, so the dividers shrink to nothing and leave
-    /// just Sleeve's icon — they keep their slot, so sections still work if it's off.
+    /// just Sleeve's icon.
     private var dividerLengthOnModernBar: CGFloat {
         settings.hideAllApps ? 0 : Self.dividerLength
+    }
+
+    /// On macOS 27 a zero-width item still gets the gap macOS puts between icons, so in
+    /// hide-all the dividers leave the bar altogether. Sections need them back.
+    private func updateDividerPresence() {
+        let present = !(Self.isModernMenuBar && settings.hideAllApps)
+        if dividerItem.isVisible != present { dividerItem.isVisible = present }
+        if alwaysDividerItem.isVisible != present { alwaysDividerItem.isVisible = present }
     }
 
     // MARK: - Native hiding
@@ -627,54 +652,140 @@ final class SectionManager: ObservableObject {
     private var lastMenuCheck = Date.distantPast
     private var menuWasOpen = false
 
+    /// After a click in the bar while apps are showing: whatever the click opened (a
+    /// menu, an app's popover) holds everything in place. The hold ends when that's
+    /// closed again, or when the user clicks somewhere else.
+    private var isHeldByClick = false
+    /// The app whose icon was clicked, so its popover counts as "still open".
+    private var heldPID: pid_t?
+    private var heldUIWasOpen = false
+
     /// Hides the moment the cursor leaves the menu bar (or the Sleeve Bar) — driven by
-    /// the cursor's own movement, so there's no polling delay. An open menu holds
-    /// everything in place, or the icon would vanish from under its own menu.
+    /// the cursor's own movement, so there's no polling delay. Clicks never hide: an
+    /// open menu or a clicked app's popover holds everything in place.
     private func startWatchingCursor() {
         stopWatchingCursor()
-        let handler: () -> Void = { [weak self] in
+        let moved: () -> Void = { [weak self] in
             guard let self, self.state != .collapsed else { return }
-            if self.isCursorInMenuBarOrBar() { return }
+            if self.isCursorInMenuBarOrBar() || Date.now < self.holdOpenUntil { return }
             // The bar is still rearranging itself for a moment after a reveal.
             if Date.now.timeIntervalSince(self.revealedAt) < 0.15 { return }
-            // Asking the window server whether a menu is open costs a little, so do
-            // it at most every 80 ms while the cursor roams outside the bar.
+            // Asking the window server what's open costs a little, so do it at most
+            // every 80 ms while the cursor roams outside the bar.
             if Date.now.timeIntervalSince(self.lastMenuCheck) > 0.08 {
                 self.lastMenuCheck = .now
                 self.menuWasOpen = Self.isAnyMenuOpen()
+                self.heldUIWasOpen = self.isHeldByClick && self.heldAppHasOpenUI()
             }
-            if !self.menuWasOpen { self.collapse() }
+            if self.menuWasOpen || self.heldUIWasOpen { return }
+            // Whatever the click opened has closed: back to plain hover rules.
+            self.isHeldByClick = false
+            self.heldPID = nil
+            self.collapse()
         }
-        let events: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDragged, .rightMouseDragged]
-        if let global = NSEvent.addGlobalMonitorForEvents(matching: events, handler: { _ in
-            Task { @MainActor in handler() }
+        let clicked: () -> Void = { [weak self] in
+            guard let self, self.state != .collapsed else { return }
+            let point = NSEvent.mouseLocation
+            if MenuBarGeometry.isInMenuBar(point, margin: 2) {
+                // A click in the bar — on an app's icon, Sleeve's, or empty space.
+                self.isHeldByClick = true
+                self.heldPID = self.items.first {
+                    self.isLive($0) && $0.frame.insetBy(dx: -2, dy: -4).contains(point)
+                }?.pid
+            } else if self.isHeldByClick && !self.isInHeldAppWindow(point) {
+                // Clicked somewhere else entirely: done with whatever was open.
+                self.isHeldByClick = false
+                self.heldPID = nil
+                self.lastMenuCheck = .distantPast
+                moved()
+            }
+        }
+        let moves: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDragged, .rightMouseDragged]
+        let clicks: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown]
+        if let global = NSEvent.addGlobalMonitorForEvents(matching: moves, handler: { _ in
+            Task { @MainActor in moved() }
         }) { cursorMonitors.append(global) }
-        if let local = NSEvent.addLocalMonitorForEvents(matching: events, handler: { event in
-            Task { @MainActor in handler() }
+        if let local = NSEvent.addLocalMonitorForEvents(matching: moves, handler: { event in
+            Task { @MainActor in moved() }
             return event
         }) { cursorMonitors.append(local) }
-        // A menu closing doesn't move the cursor; check now and then while one is open.
+        if let global = NSEvent.addGlobalMonitorForEvents(matching: clicks, handler: { _ in
+            Task { @MainActor in clicked() }
+        }) { cursorMonitors.append(global) }
+        if let local = NSEvent.addLocalMonitorForEvents(matching: clicks, handler: { event in
+            Task { @MainActor in clicked() }
+            return event
+        }) { cursorMonitors.append(local) }
+        // A menu or popover closing doesn't move the cursor; check now and then.
         rehideTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: true) { [weak self] _ in
             Task { @MainActor in
-                guard let self, self.menuWasOpen else { return }
+                guard let self, self.menuWasOpen || self.isHeldByClick else { return }
                 self.lastMenuCheck = .distantPast
-                handler()
+                moved()
             }
         }
+    }
+
+    /// Windows of the clicked app hanging from the top of the screen: its popover or
+    /// panel. Ordinary windows further down don't count, and nor do windows that sit
+    /// within the bar itself (Sleeve's own tint and icon, say), which are always there.
+    private func heldAppWindows() -> [CGRect] {
+        guard let pid = heldPID,
+              let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] else {
+            return []
+        }
+        let barHeight = NSScreen.screens.first.map(MenuBarGeometry.height(of:)) ?? 24
+        return windows.compactMap { window -> CGRect? in
+            guard (window[kCGWindowOwnerPID as String] as? pid_t) == pid,
+                  let bounds = window[kCGWindowBounds as String] as? [String: CGFloat],
+                  let y = bounds["Y"], let height = bounds["Height"], height > 4,
+                  y < 90, y + height > barHeight + 4 else { return nil }
+            return CGRect(x: bounds["X"] ?? 0, y: y, width: bounds["Width"] ?? 0, height: height)
+        }
+    }
+
+    private func heldAppHasOpenUI() -> Bool { !heldAppWindows().isEmpty }
+
+    private func isInHeldAppWindow(_ point: CGPoint) -> Bool {
+        // CG window bounds are top-left based; flip the AppKit point to match.
+        let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
+        let flipped = CGPoint(x: point.x, y: primaryHeight - point.y)
+        return heldAppWindows().contains { $0.insetBy(dx: -4, dy: -4).contains(flipped) }
     }
 
     private func stopWatchingCursor() {
         cursorMonitors.forEach { NSEvent.removeMonitor($0) }
         cursorMonitors.removeAll()
         menuWasOpen = false
+        isHeldByClick = false
+        heldPID = nil
+        heldUIWasOpen = false
     }
 
     /// Extra rect that counts as "still in the menu bar" — the Sleeve Bar, when open.
     var keepAliveRect: CGRect?
 
+    private var holdOpenUntil = Date.distantPast
+
+    /// Shows every app for a few seconds whatever the cursor does. An app that adds
+    /// its icon while the others are hidden gets put among Apple's icons, far from the
+    /// rest; with everything showing it lands beside the other apps, as usual.
+    func holdRevealed(for seconds: TimeInterval) {
+        guard method == .native else { return }
+        holdOpenUntil = .now + seconds
+        if state != .all { reveal(.all) }
+        DispatchQueue.main.asyncAfter(deadline: .now() + seconds + 0.05) { [weak self] in
+            guard let self, self.state != .collapsed, Date.now >= self.holdOpenUntil,
+                  !self.isCursorInMenuBarOrBar(), !Self.isAnyMenuOpen() else { return }
+            self.collapse()
+        }
+    }
+
     private func isCursorInMenuBarOrBar() -> Bool {
         let mouse = NSEvent.mouseLocation
         if let keepAliveRect, keepAliveRect.insetBy(dx: -8, dy: -8).contains(mouse) { return true }
+        if hintPopover?.isShown == true, let tip = hintPopover?.contentViewController?.view.window,
+           tip.frame.insetBy(dx: -8, dy: -8).contains(mouse) { return true }
         // 6 pt of slack below the bar: resting on its bottom edge mustn't flap.
         return MenuBarGeometry.isInMenuBar(mouse, margin: 6)
     }
@@ -783,6 +894,12 @@ final class SectionManager: ObservableObject {
 
     /// A plain click on Sleeve's icon (status item or fixed).
     func handlePrimaryClick(_ modifiers: NSEvent.ModifierFlags) {
+        // Hide-all: a click on the icon shows the apps, and never hides them — only
+        // moving away from the bar does that.
+        if settings.hideAllApps {
+            if state == .collapsed { reveal(.all) }
+            return
+        }
         if modifiers.contains(.option) {
             toggleAll()
             return
@@ -806,8 +923,11 @@ final class SectionManager: ObservableObject {
     /// Called to reveal from a hover when the Sleeve Bar is the reveal style.
     var onHoverRevealForBar: (() -> Void)?
 
+    /// Set by the app: whether a point belongs to Spindle (its notch pill or open panel).
+    var isSpindleArea: (CGPoint) -> Bool = { _ in false }
+
     func iconHoverBegan() {
-        guard !isHoveringIcon else { return }
+        guard !isHoveringIcon, !isSpindleArea(NSEvent.mouseLocation) else { return }
         isHoveringIcon = true
         updateIcons()
         guard settings.revealOnIconHover, state == .collapsed else { return }
@@ -857,13 +977,10 @@ final class SectionManager: ObservableObject {
     func showMenu() {
         guard Date.now.timeIntervalSince(lastMenuShown) > 0.4, let menu = menuProvider?() else { return }
         lastMenuShown = .now
-        if let host = fixedIcon?.host {
-            menu.popUp(positioning: nil, at: NSPoint(x: 0, y: -4), in: host)
-            return
-        }
-        toggleItem.menu = menu
-        toggleItem.button?.performClick(nil)
-        toggleItem.menu = nil
+        // Popped up directly, the same way from either home of the icon.
+        guard let anchor = iconAnchor else { return }
+        let below = anchor.isFlipped ? anchor.bounds.maxY + 4 : -4
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: below), in: anchor)
     }
 
     private var hintPopover: NSPopover?
@@ -885,10 +1002,21 @@ final class SectionManager: ObservableObject {
     }
 
     private func offerPlacementTipIfNeeded() {
-        guard hasAppsRightOfIcon,
-              !UserDefaults.standard.bool(forKey: "didShowPlacementTip"),
+        let defaults = UserDefaults.standard
+        guard fixedIcon == nil, state != .collapsed else { return }
+        guard hasAppsRightOfIcon else {
+            // Apps showing and none to the right: the icon is where it belongs.
+            if items.contains(where: { isLive($0) && !$0.isNativeSystemItem && !isOwn($0) }) {
+                defaults.set(true, forKey: "iconWasPlacedRight")
+            }
+            return
+        }
+        // First time, or the icon was placed right and macOS has since moved it.
+        let forgotten = defaults.bool(forKey: "iconWasPlacedRight")
+        guard !defaults.bool(forKey: "didShowPlacementTip") || forgotten,
               hintPopover?.isShown != true else { return }
-        UserDefaults.standard.set(true, forKey: "didShowPlacementTip")
+        defaults.set(true, forKey: "didShowPlacementTip")
+        defaults.set(false, forKey: "iconWasPlacedRight")
         showPlacementTip()
     }
 
@@ -896,9 +1024,10 @@ final class SectionManager: ObservableObject {
         guard let button = iconAnchor else { return }
         let popover = NSPopover()
         popover.behavior = .transient
-        popover.contentViewController = NSHostingController(rootView: PlacementTipView(close: { [weak self] in
-            self?.hintPopover?.close()
-        }))
+        popover.contentViewController = NSHostingController(rootView: PlacementTipView(
+            isFixed: fixedIcon != nil,
+            putOnRight: { [weak self] in self?.settings.fixedIcon = false },
+            close: { [weak self] in self?.hintPopover?.close() }))
         hintPopover = popover
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
     }

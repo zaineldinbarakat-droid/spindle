@@ -102,7 +102,10 @@ final class RevealGestures {
         // Hovering Sleeve's own icon. Checked here, from the global cursor stream,
         // because on macOS 27 the cursor over a status item is reported to the global
         // monitor while the button's own tracking area is unreliable.
-        let overIcon = sections.iconFrame.map { $0.insetBy(dx: -1, dy: -6).contains(point) } ?? false
+        // Never while the cursor is in Spindle's area: its open panel can lie right over
+        // Sleeve's icon, and pointing at Spindle mustn't count as pointing at Sleeve.
+        let overIcon = !spindle.owns(point)
+            && (sections.iconFrame.map { $0.insetBy(dx: -1, dy: -6).contains(point) } ?? false)
         if overIcon != sections.isHoveringIcon {
             overIcon ? sections.iconHoverBegan() : sections.iconHoverEnded()
         }
@@ -153,9 +156,12 @@ final class RevealGestures {
         if dy < 0 { reveal() } else { conceal() }
     }
 
+    /// A click on the empty bar shows the apps. It never hides them: clicks don't hide
+    /// in Sleeve — moving away from the bar does.
     private func clicked() {
-        guard settings.revealOnEmptyClick, isOverEmptyBar(NSEvent.mouseLocation) else { return }
-        if sections.state == .collapsed { reveal() } else { conceal() }
+        guard settings.revealOnEmptyClick, isOverEmptyBar(NSEvent.mouseLocation),
+              sections.state == .collapsed else { return }
+        reveal()
     }
 
     func tearDown() {

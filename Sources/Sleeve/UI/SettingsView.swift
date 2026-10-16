@@ -145,11 +145,18 @@ private struct GeneralTab: View {
             }
             Section("Icon style") {
                 IconStylePicker()
-                Toggle("Keep the icon in a fixed place (it never shifts as apps come and go)", isOn: $settings.fixedIcon)
+                Picker("Sleeve's icon", selection: $settings.fixedIcon) {
+                    Text("On the right, with your icons").tag(false)
+                    Text("Fixed beside the notch").tag(true)
+                }
+                Text(settings.fixedIcon
+                     ? "Never moves; your apps appear to its right."
+                     : "⌘-drag it once to the right of all your apps, beside Wi-Fi: they then appear to its left and it stays put.")
+                    .font(.caption).foregroundStyle(.secondary)
                 Toggle("Reveal when hovering over Sleeve's icon", isOn: $settings.revealOnIconHover)
                 Toggle("Two-finger click the menu bar for Sleeve's menu (Show Hidden Apps and more)", isOn: $settings.revealOnTwoFingerClick)
 
-                Text("Hover or click Sleeve's icon to show your apps · two-finger click the menu bar for Show Hidden Apps, Zen mode, search, menu bar color… Tip: ⌘-drag Sleeve's icon next to the clock, so revealed apps appear to its left and it stays put under your cursor.")
+                Text("Hover or click Sleeve's icon to show your apps · two-finger click the menu bar for Show Hidden Apps, Zen mode, search, menu bar color…")
                     .font(.caption).foregroundStyle(.secondary)
             }
             if SectionManager.isModernMenuBar {
@@ -315,9 +322,6 @@ private struct LayoutTab: View {
     @EnvironmentObject private var sections: SectionManager
     @State private var moving: String?
     @State private var error: String?
-    @State private var spacing: Double = Double(MenuBarSpacing.current ?? 8)
-    @State private var usesDefaultSpacing = MenuBarSpacing.current == nil
-    @State private var confirmRelaunch = false
 
     @EnvironmentObject private var settings: SleeveSettings
 
@@ -360,31 +364,11 @@ private struct LayoutTab: View {
                 Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(.orange).font(.caption)
             }
 
-            GroupBox("Icon spacing") {
-                HStack {
-                    Toggle("System default", isOn: $usesDefaultSpacing)
-                    Slider(value: $spacing, in: 0...20, step: 1).disabled(usesDefaultSpacing)
-                    Text(usesDefaultSpacing ? "—" : "\(Int(spacing)) pt").monospacedDigit().frame(width: 44)
-                    Button("Apply…") { confirmRelaunch = true }
-                }
-                Text("Takes effect once the apps that own menu bar icons restart. Apply restarts them for you.")
-                    .font(.caption).foregroundStyle(.secondary)
+            GroupBox("Space between icons") {
+                VStack(alignment: .leading, spacing: 8) { SpacingControls() }
             }
         }
         .padding(8)
-        .confirmationDialog("Restart menu bar apps?", isPresented: $confirmRelaunch) {
-            Button("Apply and Restart Apps") {
-                MenuBarSpacing.set(usesDefaultSpacing ? nil : Int(spacing))
-                MenuBarSpacing.relaunch(MenuBarSpacing.appsToRelaunch(from: sections.items))
-            }
-            Button("Apply Without Restarting") {
-                MenuBarSpacing.set(usesDefaultSpacing ? nil : Int(spacing))
-            }
-        } message: {
-            let names = MenuBarSpacing.appsToRelaunch(from: sections.items)
-                .compactMap(\.localizedName).joined(separator: ", ")
-            Text("These will quit and reopen: \(names)")
-        }
     }
 
     private func move(_ id: String, to section: MenuBarSection) {
@@ -453,11 +437,61 @@ private struct AlwaysShownList: View {
             } header: {
                 Text("Where each app's icon goes")
             } footer: {
-                Text("Always: never hidden. On Hover: appears when you hover over the menu bar, hides when you move away. Hidden: never in the menu bar — it waits in the hidden section (two-finger click the bar → Show Hidden Apps), along with any app that doesn't fit. Apple's own icons always stay.")
+                Text("Always: never hidden. On Hover: appears when you hover over the menu bar, hides when you move away. Hidden: never in the menu bar — it waits in the hidden section (two-finger click the bar → Show Hidden Apps), along with any app that doesn't fit. Apple's own icons always stay, except Now Playing, which macOS hides with the apps.")
                     .font(.caption).foregroundStyle(.secondary)
+            }
+            Section("Space between icons") {
+                SpacingControls()
             }
         }
         .formStyle(.grouped)
+    }
+}
+
+/// Space between menu bar icons, for every app's icons.
+private struct SpacingControls: View {
+    @EnvironmentObject private var sections: SectionManager
+    @State private var spacing: Double = Double(MenuBarSpacing.current ?? 8)
+    @State private var usesDefault = MenuBarSpacing.current == nil
+    @State private var confirm = false
+
+    var body: some View {
+        Group {
+            Toggle("Use macOS's standard spacing", isOn: $usesDefault)
+            LabeledContent("Spacing") {
+                HStack {
+                    Text("Tight").font(.caption).foregroundStyle(.secondary)
+                    Slider(value: $spacing, in: 0...20, step: 1)
+                    Text("Roomy").font(.caption).foregroundStyle(.secondary)
+                    Text("\(Int(spacing)) pt").monospacedDigit().frame(width: 40, alignment: .trailing)
+                }
+            }
+            .disabled(usesDefault)
+            HStack {
+                Text("macOS applies spacing when an app adds its icon, so Apply restarts the apps that have icons.")
+                    .font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                Button("Apply…") { confirm = true }
+            }
+        }
+        .confirmationDialog("Restart menu bar apps to apply the spacing?", isPresented: $confirm) {
+            Button("Apply and Restart Apps") { apply(restart: true) }
+            Button("Apply Without Restarting") { apply(restart: false) }
+        } message: {
+            let names = MenuBarSpacing.appsToRelaunch(from: sections.items)
+                .compactMap(\.localizedName).joined(separator: ", ")
+            Text("These will quit and reopen: \(names)")
+        }
+    }
+
+    private func apply(restart: Bool) {
+        MenuBarSpacing.set(usesDefault ? nil : Int(spacing))
+        guard restart else { return }
+        // Show every app while they restart: an icon re-added while the others are
+        // hidden lands among Apple's, far from the rest.
+        sections.holdRevealed(for: 8)
+        let apps = MenuBarSpacing.appsToRelaunch(from: sections.items)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { MenuBarSpacing.relaunch(apps) }
     }
 }
 

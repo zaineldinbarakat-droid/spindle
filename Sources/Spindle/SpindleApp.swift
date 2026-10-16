@@ -23,6 +23,8 @@ enum SpindleMain {
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUserNotificationCenterDelegate {
     private var notchController: NotchWindowController?
     private var statusItem: NSStatusItem?
+    /// Sleeve has been asked to show every app before the icon goes in.
+    private var addingIconAfterSleeve = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         MainActor.assumeIsolated {
@@ -69,6 +71,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
 
     @MainActor
     private func installStatusItem() {
+        // With Sleeve hiding the other apps, an icon added now would land among
+        // Apple's, far from the rest: ask Sleeve to show them all first.
+        let sleeveRunning = !NSRunningApplication.runningApplications(
+            withBundleIdentifier: SyncChannel.sleeveBundleID).isEmpty
+        guard !sleeveRunning || addingIconAfterSleeve else {
+            SyncChannel.post(SyncChannel.spindleAddingIcon)
+            addingIconAfterSleeve = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in self?.installStatusItem() }
+            return
+        }
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         item.button?.image = NSImage(systemSymbolName: "smallcircle.filled.circle",
                                      accessibilityDescription: "Spindle")

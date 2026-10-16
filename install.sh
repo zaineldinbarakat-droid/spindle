@@ -10,7 +10,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 "$ROOT/build.sh" release
 
-for app in Spindle Sleeve; do
+# Sleeve first, so its hiding is lifted before anything else changes.
+for app in Sleeve Spindle; do
     osascript -e "tell application id \"com.spindle.$( [ $app = Spindle ] && echo notch || echo sleeve )\" to quit" >/dev/null 2>&1 || true
 done
 sleep 1
@@ -23,4 +24,8 @@ for app in Spindle Sleeve; do
     echo "Installed /Applications/$app.app"
 done
 
-open "/Applications/Spindle.app" "/Applications/Sleeve.app"
+# Spindle first: an icon added while Sleeve is hiding apps lands among Apple's
+# icons, far from the rest.
+open "/Applications/Spindle.app"
+sleep 2
+open "/Applications/Sleeve.app"

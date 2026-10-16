@@ -28,6 +28,10 @@ public enum SyncChannel {
     public static let sleeveBar = Notification.Name("com.spindle.sync.sleeveBar")
     /// Sleeve → Spindle: Sleeve quit; drop any state it had imposed (e.g. Zen).
     public static let sleeveTerminated = Notification.Name("com.spindle.sync.sleeveTerminated")
+    /// Spindle → Sleeve: about to add its menu bar icon. An icon added while Sleeve has
+    /// the other apps hidden lands among Apple's icons, so Sleeve shows them all for a
+    /// moment. (macOS doesn't announce the launch of a menu-bar-only app like Spindle.)
+    public static let spindleAddingIcon = Notification.Name("com.spindle.sync.spindleAddingIcon")
 
     public static func post(_ name: Notification.Name, _ info: [String: Any] = [:]) {
         DistributedNotificationCenter.default().postNotificationName(

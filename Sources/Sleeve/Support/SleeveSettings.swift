@@ -179,11 +179,18 @@ final class SleeveSettings: ObservableObject {
             d.set(6, forKey: "settingsVersion")
             d.set(false, forKey: "useSleeveBar")
         }
+        // v7: Sleeve's icon sits on the right with the apps (one ⌘-drag puts it beside
+        // Apple's icons for good); the fixed spot beside the notch is now the option.
+        if d.integer(forKey: "settingsVersion") < 7 {
+            d.set(7, forKey: "settingsVersion")
+            d.set(false, forKey: "fixedIcon")
+            d.removeObject(forKey: "didShowPlacementTip")
+        }
         toggleIcon = ToggleIcon(rawValue: d.string(forKey: "toggleIcon") ?? "") ?? .eye
         revealOnTwoFingerClick = bool("revealOnTwoFingerClick", true)
         d.removeObject(forKey: "showIcon")  // the icon is always shown now
         revealOnIconHover = bool("revealOnIconHover", true)
-        fixedIcon = bool("fixedIcon", true)
+        fixedIcon = bool("fixedIcon", false)
         customIconData = d.data(forKey: "customIconData")
         revealOnHover = bool("revealOnHover", true)
         revealOnScroll = bool("revealOnScroll", true)
