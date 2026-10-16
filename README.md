@@ -79,14 +79,20 @@ of the screen.
 - **Instant and steady.** Revealing on hover and hiding when the cursor leaves the menu
   bar have no delay (measured on macOS 27: ~100 ms to show, ~70 ms to hide, including
   macOS redrawing the bar), with a little spatial slack so resting on the bar's edge
-  never flickers. An open menu holds things in place.
+  never flickers. Clicking never hides anything: an app's menu or popover opened from
+  the bar keeps every icon where it is until it closes and the cursor leaves the bar.
+  Hovering Spindle's notch never reveals anything.
 - **Two-finger click** anywhere on the menu bar (not on another app's icon) for Sleeve's
   options: Show Hidden Apps, show/hide the menu bar apps, search, Zen mode, menu bar
   color, settings and updates.
-- **An icon that never moves.** macOS 27 shuffles status items as apps come and go and
-  won't let an app choose its spot, so Sleeve draws its icon in a small window of its
-  own at a fixed place — the left end of where your apps appear, clear of the notch and
-  Spindle — and its real status item shrinks to an invisible placeholder.
+- **Its icon on the right.** macOS 27 adds every app's icon at the left end of the
+  others and won't let an app choose its own spot, so Sleeve asks for one ⌘-drag: put
+  its icon to the right of all your apps, beside Wi-Fi, and they appear to its left
+  while it stays put (right of Now Playing too: macOS's native hiding always hides
+  Apple's Now Playing icon along with the apps). Sleeve reminds you if macOS ever
+  moves it back. Or choose
+  *Fixed beside the notch* (Settings → General): Sleeve then draws its icon in a small
+  window of its own at a spot that never changes, with your apps appearing to its right.
 - **An icon with two faces,** like Ice's image sets, always in the bar: an outlined eye
   while your apps are tucked away; hover it and it morphs into the filled eye with a
   little bounce as they come out, and morphs back when you move away. Or dot, ellipsis,
@@ -107,7 +113,10 @@ of the screen.
   stops evenly, point them any direction; or multi-stop gradients (add, drag and recolour stops, set
   any angle; Sunset, Aurora, Ice and Neon presets), Full / Rounded / Split-capsule shapes, shadows and
   borders, with a separate Dark Mode style and per-display overrides.
-- **Spacing.** A slider for icon spacing (applied by restarting the apps that own icons).
+- **Spacing.** *Space between icons* in Settings → Layout, from tight to roomy, for every
+  app's icons (macOS applies it when an app adds its icon, so Apply restarts the apps
+  that have icons — with every app showing, so their icons come back in the usual
+  place).
 - **Search.** ⌃⌥⌘S opens a finder for every menu bar icon; Return opens its menu.
 - **Automation.** Keep a section open while the battery is low, a given Wi-Fi network is
   connected, a Focus is on, or a script exits 0.

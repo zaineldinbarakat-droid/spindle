@@ -1,5 +1,5 @@
 {
-  "version": "0.3.8",
-  "notes": "Sleeve: the icon now stays in one fixed place as apps appear and disappear; friendlier menu bar color settings with a live preview, palettes, swatches, direction arrows and an Album mode that follows Spindle's song.",
+  "version": "0.3.9",
+  "notes": "Sleeve: its icon sits on the right (one ⌘-drag beside Wi-Fi keeps it there); clicks never hide apps, only moving away does; hovering Spindle's notch never reveals apps; adjustable space between icons in Layout; no stray gaps; Spindle's icon lands beside the other apps. Spindle: the notch tucks away sooner when you move off it.",
   "minimumSystemVersion": "14.0"
 }
