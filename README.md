@@ -10,18 +10,23 @@
 </p>
 
 <p align="center">
+  🤝 <b>Made to be compatible with <a href="https://github.com/zaineldinbarakat-droid/sleeve">Sleeve</a></b>, my menu bar manager — use them together, or each on its own.
+</p>
+
+<p align="center">
   <a href="https://github.com/zaineldinbarakat-droid/spindle/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/zaineldinbarakat-droid/spindle?label=release&color=e8735b"></a>
   <img alt="macOS 14+" src="https://img.shields.io/badge/macOS-14%2B-black?logo=apple">
   <img alt="Swift 6" src="https://img.shields.io/badge/Swift-6-F05138?logo=swift&logoColor=white">
   <img alt="SwiftUI + AppKit" src="https://img.shields.io/badge/UI-SwiftUI%20%2B%20AppKit-0A84FF">
   <img alt="Apple Silicon" src="https://img.shields.io/badge/Apple%20Silicon-native-555">
   <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-3da639"></a>
+  <a href="https://github.com/zaineldinbarakat-droid/sleeve"><img alt="Works with Sleeve" src="https://img.shields.io/badge/works%20with-Sleeve-6b54ed"></a>
 </p>
 
 <p align="center">
   <a href="https://github.com/zaineldinbarakat-droid/spindle/releases/latest/download/Spindle.zip"><b>⬇︎ Download Spindle</b></a>
   &nbsp;·&nbsp;
-  <a href="#made-to-work-with-sleeve">Works with Sleeve</a>
+  <a href="#made-to-be-compatible-with-sleeve">Works with Sleeve</a>
   &nbsp;·&nbsp;
   <a href="#under-the-hood">Under the hood</a>
 </p>
@@ -29,8 +34,6 @@
 <p align="center">
   <img src="docs/images/spindle-fullscreen.jpg" alt="Spindle's full-screen turntable: a walnut deck with a spinning record, the song's details and a focus timer">
 </p>
-
-> 🤝 **Made to work with [Sleeve](https://github.com/zaineldinbarakat-droid/sleeve)**, my menu bar manager. The two apps talk to each other and share the top of your screen seamlessly — and each works perfectly on its own.
 
 ## Features
 
@@ -54,7 +57,7 @@
 - **Featherweight.** Idle, about **0.1 % CPU and 30 MB**; animations run on Core Animation, so playing music costs Spindle next to nothing.
 - **Private by design.** No account, no API key, no tracking.
 
-## Made to work with Sleeve
+## Made to be compatible with Sleeve
 
 Spindle and [**Sleeve**](https://github.com/zaineldinbarakat-droid/sleeve) — a menu bar manager that hides your menu bar apps until you hover the bar — were designed as a pair:
 
