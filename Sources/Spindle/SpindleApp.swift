@@ -116,7 +116,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
             : "Focus Timer"
         let focusItem = NSMenuItem(title: focusTitle, action: nil, keyEquivalent: "")
         let focusMenu = NSMenu()
-        add(to: focusMenu, timer.isRunning ? "Pause" : (timer.isPaused ? "Resume" : "Start Focus"),
+        add(to: focusMenu, timer.isRunning ? "Pause" : (timer.isPaused ? "Resume" : "Lock In"),
             #selector(toggleTimer))
         add(to: focusMenu, "Skip to Next Phase", #selector(skipPhase))
         add(to: focusMenu, "Reset", #selector(resetTimer))

@@ -227,7 +227,7 @@ private struct FullScreenTimer: View {
     private var tint: Color { timer.isActive ? timer.phase.color : Theme.cream.opacity(0.65) }
 
     private var caption: String {
-        guard timer.isActive else { return "FOCUS TIMER" }
+        guard timer.isActive else { return "READY TO LOCK IN" }
         let phase = timer.phase.title.uppercased()
         return timer.isPaused ? "\(phase) · PAUSED" : phase
     }
@@ -261,7 +261,7 @@ private struct FullScreenTimer: View {
             } else {
                 HStack(spacing: 12) {
                     PresetSwitch()
-                    PlateButton(symbol: "play.fill", prominent: true, help: "Start focusing") { timer.start() }
+                    PlateButton(symbol: "play.fill", prominent: true, help: "Lock in") { timer.start() }
                 }
             }
         }
