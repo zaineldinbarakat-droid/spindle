@@ -9,6 +9,7 @@ struct SettingsView: View {
 
     @State private var launchAtLogin = LaunchAtLogin.isEnabled
     @AppStorage(ArtworkStyle.storageKey) private var artworkStyle: ArtworkStyle = .vinyl
+    @AppStorage(Defaults.Key.fullScreenTimer.rawValue) private var fullScreenTimer = true
 
     var body: some View {
         Form {
@@ -35,6 +36,8 @@ struct SettingsView: View {
                     }
                     Toggle("Tint the glass with the album's color", isOn: $notch.glassTinted)
                 }
+                Toggle("Glow behind the album cover", isOn: $notch.coverGlow)
+                    .help("Off: around the cover is just the notch's own look, with no colour rising from behind it.")
                 Picker("When closed, show", selection: $notch.collapsedShowsCover) {
                     Text("Album Cover").tag(true)
                     Text("Spinning Record").tag(false)
@@ -184,6 +187,7 @@ struct SettingsView: View {
                 Button(desktop.isFullScreenVisible ? "Exit Full-Screen Turntable" : "Open Full-Screen Turntable") {
                     desktop.toggleFullScreen()
                 }
+                Toggle("Show the focus timer on the full-screen turntable", isOn: $fullScreenTimer)
                 Text("Drag a widget by its wooden edge to move it; right-click to remove it.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)

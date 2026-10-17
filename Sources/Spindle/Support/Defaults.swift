@@ -16,6 +16,7 @@ enum Defaults {
         case indicatorGlow
         case glassClarity
         case glassTinted
+        case coverGlow
 
         // Focus timer
         case focusMinutes
@@ -31,6 +32,7 @@ enum Defaults {
         case recordWidgetVisible
         case turntableWidgetVisible
         case desktopBackdropVisible
+        case fullScreenTimer
     }
 
     static func bool(_ key: Key, default fallback: Bool) -> Bool {

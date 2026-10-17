@@ -49,6 +49,8 @@ Built and verified against a MacBook Pro `Mac17,2` on macOS 27.0.
   colour.
 - **Seamless with the hardware notch.** Pure #000 black, small shoulders and gently
   rounded corners like the MacBook's notch; no album colour reaches it unless you ask.
+  Around the cover there's just the notch's own look — no glow rising from behind it,
+  not even a coloured edge — unless you turn on *Glow behind the album cover*.
 - **Notch look.** *Song Color* (the default) washes the open panel in a deep tint of
   the cover's dominant colour, cross-fading when the song changes, while the notch
   itself stays hardware-black — or let the colour reach into the notch too; *Black*
@@ -57,7 +59,10 @@ Built and verified against a MacBook Pro `Mac17,2` on macOS 27.0.
 - **Vinyl or cover.** *Show Song As* switches between the spinning record and the plain
   album cover, in the notch, the widgets and full screen.
 - **Full-screen turntable.** The same scene as an interactive full-screen space.
-  Esc leaves it.
+  Esc leaves it. Beside the song sits the focus timer: idle, a quiet plate with the
+  25/5 · 50/10 switch and a start button; running, the phase, a big serif countdown, a
+  ring filling in the phase's colour, the sessions done, and pause / skip / reset. The
+  *Timer* button in the corner (or Settings → Desktop) hides it.
 
 Everything is in the menu-bar icon's menu and in Settings.
 

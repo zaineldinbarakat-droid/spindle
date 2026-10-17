@@ -26,6 +26,8 @@ enum ArtworkStyle: String, CaseIterable, Identifiable {
 /// UserDefaults directly, so flipping the setting updates all of them at once.
 struct DeckView: View {
     var size: CGFloat
+    /// The album-coloured glow behind the cover (the notch turns it off unless asked).
+    var glow: Bool = true
 
     @AppStorage(ArtworkStyle.storageKey) private var style: ArtworkStyle = .vinyl
 
@@ -36,7 +38,7 @@ struct DeckView: View {
                 TurntableView(diameter: size)
                     .frame(width: size * 1.55, height: size * 1.18)
             case .cover:
-                CoverArtView(size: size)
+                CoverArtView(size: size, glow: glow)
                     .frame(width: size, height: size)
             }
         }
@@ -48,6 +50,7 @@ struct DeckView: View {
 /// way the record stops spinning, so the two modes give the same feedback.
 struct CoverArtView: View {
     var size: CGFloat
+    var glow: Bool = true
 
     @EnvironmentObject private var player: PlayerManager
 
@@ -57,10 +60,16 @@ struct CoverArtView: View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
 
         ZStack {
-            shape.fill(
-                LinearGradient(colors: [player.accent.opacity(0.9), player.accent.opacity(0.45)],
-                               startPoint: .topLeading, endPoint: .bottomTrailing)
-            )
+            // Under real artwork: black, so no colour can fringe its antialiased edge.
+            // The colour only stands in while there's no cover to show.
+            if player.artwork != nil || !glow {
+                shape.fill(player.artwork == nil ? Color(white: 0.14) : .black)
+            } else {
+                shape.fill(
+                    LinearGradient(colors: [player.accent.opacity(0.9), player.accent.opacity(0.45)],
+                                   startPoint: .topLeading, endPoint: .bottomTrailing)
+                )
+            }
 
             if let artwork = player.artwork {
                 Image(nsImage: artwork)
@@ -77,7 +86,7 @@ struct CoverArtView: View {
         .frame(width: size, height: size)
         .clipShape(shape)
         .overlay(shape.strokeBorder(Color.white.opacity(0.10), lineWidth: 0.5))
-        .shadow(color: player.accent.opacity(0.35), radius: size * 0.12, y: size * 0.04)
+        .shadow(color: player.accent.opacity(glow ? 0.35 : 0), radius: size * 0.12, y: size * 0.04)
         .shadow(color: .black.opacity(0.5), radius: size * 0.05, y: size * 0.03)
         .scaleEffect(player.snapshot.isPlaying ? 1 : 0.94)
         .animation(.spring(response: 0.5, dampingFraction: 0.8), value: player.snapshot.isPlaying)
@@ -106,7 +115,7 @@ struct ArtworkThumbnail: View {
             case .cover:
                 ZStack {
                     RoundedRectangle(cornerRadius: size * 0.22, style: .continuous)
-                        .fill(player.accent.opacity(0.6))
+                        .fill(player.artwork == nil ? Color(white: 0.2) : .black)
                     if let artwork = player.artwork {
                         Image(nsImage: artwork)
                             .resizable()
