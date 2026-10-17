@@ -1,5 +1,5 @@
 {
-  "version": "0.3.9",
-  "notes": "Sleeve: its icon sits on the right (one ⌘-drag beside Wi-Fi keeps it there); clicks never hide apps, only moving away does; hovering Spindle's notch never reveals apps; adjustable space between icons in Layout; no stray gaps; Spindle's icon lands beside the other apps. Spindle: the notch tucks away sooner when you move off it.",
+  "version": "0.4.0",
+  "notes": "Sleeve: the two-finger-click menu opens instantly and stays smooth (it opens where you click instead of from the menu bar icon); hovering the menu bar works whichever app is in front; 12 new icon styles that go from empty to full (heart, star, moon, tray, battery, bolt, drop, leaf, flame, cloud, bulb, paw) plus Emoji: any emoji, grey while apps are hidden and full colour when they show, or a pair like 🌑 → 🌕.",
   "minimumSystemVersion": "14.0"
 }
