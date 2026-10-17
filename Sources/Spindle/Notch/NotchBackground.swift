@@ -69,6 +69,11 @@ struct NotchBackground: View {
                 shape.fill(Theme.panel)
             }
 
+        case .liquidGlass where !isExpanded:
+            // Closed, the pill stays black like the hardware notch it hugs: clear glass
+            // there would show the menu bar through the wings beside the camera.
+            shape.fill(Theme.panel)
+
         case .liquidGlass:
             if #available(macOS 26, *) {
                 LiquidGlassFill(clarity: viewModel.glassClarity,
@@ -108,8 +113,9 @@ extension Color {
 /// Apple's Liquid Glass with a continuous clarity control, from AppKit's own
 /// `NSGlassEffectView` — the same glass macOS draws its windows and controls with.
 ///
-/// - Clear (top of the slider): nothing but Apple's *clear* glass — see-through,
-///   refracting what's behind it.
+/// - Clear (top of the slider): the see-through lensing glass. What's behind stays
+///   sharp, and the edges bend and catch the light. (The public `.clear` style, over
+///   another app's windows, comes out as a heavy frost; see `AppleGlass`.)
 /// - Frosted (bottom): the system's frosted material over it, dimmed a touch.
 /// In between, the frost fades in proportion, so the slider has no jumps. Shaped as
 /// a panel hanging from the top edge: its upper corners sit above the window, off
@@ -129,7 +135,9 @@ struct LiquidGlassFill: View {
             BehindWindowBlur()
                 .clipShape(shape)
                 .opacity(frost)
-            shape.fill(Color.black.opacity(0.3 * frost))
+            // A breath of shade even when clear, so white type stays readable over a
+            // bright window behind.
+            shape.fill(Color.black.opacity(0.1 + 0.22 * frost))
         }
         .animation(.easeInOut(duration: 0.25), value: clarity)
     }
@@ -140,9 +148,19 @@ private struct AppleGlass: NSViewRepresentable {
     var tint: NSColor?
     var cornerRadius: CGFloat
 
+    /// The lensing variant of Apple's glass. NSGlassEffectView's public styles, placed
+    /// over other apps' windows, blur them heavily — even `.clear` reads as frosted.
+    /// This variant (a private setting of the same view, checked on macOS 27) keeps
+    /// what's behind sharp and refracts it at the edges, like Apple's own clear glass.
+    /// If a later macOS drops the setting, the public clear style stands in.
+    static let lensingVariant = 11
+
     func makeNSView(context: Context) -> NSGlassEffectView {
         let view = NSGlassEffectView()
         view.style = .clear
+        if view.responds(to: NSSelectorFromString("set_variant:")) {
+            view.setValue(Self.lensingVariant, forKey: "_variant")
+        }
         return view
     }
 

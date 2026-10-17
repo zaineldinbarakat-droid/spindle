@@ -4,55 +4,48 @@ import SwiftUI
 ///
 /// The disc splits into two layers: a static one (base, grooves) that never redraws, and
 /// a rotating one (sheen, label, pressing mark). Concentric grooves look identical under
-/// rotation, so keeping them still costs nothing visually and saves a full Canvas redraw
-/// on every frame.
+/// rotation, so keeping them still costs nothing visually.
+///
+/// The rotating part is drawn once into an image and spun by Core Animation: the
+/// window server turns it at the display's own rate (120 Hz on ProMotion) while Spindle
+/// does nothing per frame. It's redrawn only when the cover, colour or size changes.
 struct VinylView: View {
     var artwork: NSImage?
     var accent: Color
     var isSpinning: Bool
     var rpm: Double = Theme.Record.rpm
 
-    @State private var baseAngle: Double = 0
-    @State private var spinStart: Date?
+    @State private var rotatingImage: CGImage?
+    @Environment(\.displayScale) private var displayScale
 
     private var degreesPerSecond: Double { rpm * 6 }
+
+    private struct RenderKey: Equatable {
+        var size: CGFloat
+        var artwork: ObjectIdentifier?
+        var accent: Color
+        var scale: CGFloat
+    }
 
     var body: some View {
         GeometryReader { geo in
             let size = min(geo.size.width, geo.size.height)
 
-            // No minimum interval: frames follow the display (120 Hz on ProMotion).
-            // A fixed 90 fps on a 120 Hz panel lands unevenly and the record judders.
-            TimelineView(.animation(minimumInterval: nil, paused: !isSpinning)) { timeline in
-                ZStack {
-                    staticDisc(size: size)
-                    rotatingDisc(size: size)
-                        .rotationEffect(.degrees(angle(at: timeline.date)))
-                }
-                .frame(width: size, height: size)
+            ZStack {
+                staticDisc(size: size)
+                SpinningLayer(image: rotatingImage, isSpinning: isSpinning, degreesPerSecond: degreesPerSecond)
+                    .frame(width: size, height: size)
             }
+            .frame(width: size, height: size)
             .frame(width: geo.size.width, height: geo.size.height)
-        }
-        .onAppear { if isSpinning { spinStart = .now } }
-        .onChange(of: isSpinning) { _, nowSpinning in
-            let now = Date.now
-            if nowSpinning {
-                spinStart = now
-            } else if let start = spinStart {
-                // Freeze where the record actually is rather than snapping to zero.
-                baseAngle = normalized(baseAngle + now.timeIntervalSince(start) * degreesPerSecond)
-                spinStart = nil
+            .task(id: RenderKey(size: size, artwork: artwork.map(ObjectIdentifier.init),
+                                accent: accent, scale: displayScale)) {
+                guard size > 0 else { return }
+                let renderer = ImageRenderer(content: rotatingDisc(size: size))
+                renderer.scale = displayScale
+                rotatingImage = renderer.cgImage
             }
         }
-    }
-
-    private func angle(at date: Date) -> Double {
-        guard let spinStart else { return baseAngle }
-        return baseAngle + date.timeIntervalSince(spinStart) * degreesPerSecond
-    }
-
-    private func normalized(_ degrees: Double) -> Double {
-        degrees.truncatingRemainder(dividingBy: 360)
     }
 
     // MARK: - Layers
@@ -192,5 +185,68 @@ private struct GrooveCanvas: View {
                                lineWidth: isBand ? lineWidth * 1.6 : lineWidth)
             }
         }
+    }
+}
+
+/// An image turned by Core Animation. Stopping freezes it where it is; starting again
+/// carries on from there, the way a platter does.
+struct SpinningLayer: NSViewRepresentable {
+    var image: CGImage?
+    var isSpinning: Bool
+    var degreesPerSecond: Double
+
+    func makeNSView(context: Context) -> SpinningLayerView { SpinningLayerView() }
+
+    func updateNSView(_ view: SpinningLayerView, context: Context) {
+        view.update(image: image, spinning: isSpinning, degreesPerSecond: degreesPerSecond)
+    }
+}
+
+final class SpinningLayerView: NSView {
+    private let disc = CALayer()
+    private var isSpinning = false
+
+    init() {
+        super.init(frame: .zero)
+        // Layer-hosting, so the disc's anchor stays at its centre whatever AppKit does.
+        layer = CALayer()
+        wantsLayer = true
+        disc.contentsGravity = .resizeAspect
+        layer?.addSublayer(disc)
+    }
+
+    required init?(coder: NSCoder) { fatalError("not used") }
+
+    override func layout() {
+        super.layout()
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        disc.bounds = bounds
+        disc.position = CGPoint(x: bounds.midX, y: bounds.midY)
+        CATransaction.commit()
+    }
+
+    func update(image: CGImage?, spinning: Bool, degreesPerSecond: Double) {
+        if (disc.contents as! CGImage?) !== image {
+            // A new cover cross-fades in (Core Animation's implicit fade on contents).
+            disc.contents = image
+        }
+        guard spinning != isSpinning else { return }
+        isSpinning = spinning
+        let current = (disc.presentation() ?? disc).value(forKeyPath: "transform.rotation.z") as? CGFloat ?? 0
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        disc.removeAnimation(forKey: "spin")
+        disc.setValue(current, forKeyPath: "transform.rotation.z")
+        CATransaction.commit()
+        guard spinning, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return }
+        // Clockwise, seen from above: negative in Core Animation's y-up space.
+        let spin = CABasicAnimation(keyPath: "transform.rotation.z")
+        spin.fromValue = current
+        spin.toValue = current - 2 * .pi
+        spin.duration = 360 / max(degreesPerSecond, 1)
+        spin.repeatCount = .infinity
+        spin.isRemovedOnCompletion = false
+        disc.add(spin, forKey: "spin")
     }
 }

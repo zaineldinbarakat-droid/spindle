@@ -44,9 +44,11 @@ Built and verified against a MacBook Pro `Mac17,2` on macOS 27.0.
   the slightest settle, and its content resolves out of a blur rather than popping in;
   its sides flare smoothly out of the hardware notch.
 - **Liquid Glass with a Clarity slider**: at *Clear* it's AppKit's own
-  `NSGlassEffectView` in its clear style — real, see-through Liquid Glass — and toward
+  `NSGlassEffectView` in its lensing variant — genuinely see-through: what's behind
+  stays sharp and the edges bend and catch the light, like Apple's clear glass. (The
+  public clear style, over other apps' windows, comes out heavily frosted.) Toward
   *Frosted* the system's frosted material fades in. Optionally tinted with the album's
-  colour.
+  colour; the closed pill stays black, one with the hardware notch.
 - **Seamless with the hardware notch.** Pure #000 black, small shoulders and gently
   rounded corners like the MacBook's notch; no album colour reaches it unless you ask.
   Around the cover there's just the notch's own look — no glow rising from behind it,
@@ -58,6 +60,11 @@ Built and verified against a MacBook Pro `Mac17,2` on macOS 27.0.
   *Liquid Glass* uses macOS 26's glass material tinted with the cover.
 - **Vinyl or cover.** *Show Song As* switches between the spinning record and the plain
   album cover, in the notch, the widgets and full screen.
+- **Light on the Mac.** Idle, Spindle uses ~0.1% CPU and ~30 MB. The playing
+  indicator and the spinning record are Core Animation loops handed to the window
+  server, so while music plays Spindle does no per-frame work; the music apps' own
+  play/pause/track notifications drive updates, with a re-sync poll every 3 s while
+  playing and 10 s otherwise.
 - **Full-screen turntable.** The same scene as an interactive full-screen space.
   Esc leaves it. Beside the song sits the focus timer: idle, a quiet plate with the
   25/5 · 50/10 switch and a start button; running, the phase, a big serif countdown, a
@@ -90,6 +97,9 @@ of the screen.
 - **Two-finger click** anywhere on the menu bar (not on another app's icon) for Sleeve's
   options, right where you clicked: Show Hidden Apps, show/hide the menu bar apps,
   search, Zen mode, menu bar color, settings and updates.
+- **Light on the Mac.** Idle, Sleeve uses ~0.1% CPU and ~15 MB. It reads every
+  app's menu bar only when apps launch or quit (and once a minute); in between it
+  re-reads just the few apps that have icons.
 - **Works whichever app is in front.** Sleeve follows the cursor with a passive,
   listen-only event tap, so hovering the bar works the same whether another app, Sleeve
   itself or nothing has focus (macOS's ordinary event monitors only see events meant

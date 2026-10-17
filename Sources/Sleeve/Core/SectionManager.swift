@@ -205,7 +205,21 @@ final class SectionManager: ObservableObject {
             }
         }
 
-        rescan()
+        // Any app launching — menu-bar-only ones included, which macOS doesn't announce —
+        // changes the running list: look for new icons then, and again a little later
+        // for apps that add theirs only once they've finished starting.
+        NSWorkspace.shared.publisher(for: \.runningApplications)
+            .map(\.count)
+            .removeDuplicates()
+            .dropFirst()
+            .debounce(for: .seconds(1), scheduler: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.rescan(full: true)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 4) { self?.rescan(full: true) }
+            }
+            .store(in: &cancellables)
+
+        rescan(full: true)
         // Collapse once the first scan has told us where everything is.
         Task {
             try? await Task.sleep(for: .milliseconds(400))
@@ -384,7 +398,7 @@ final class SectionManager: ObservableObject {
 
     // MARK: - Scanning
 
-    func rescan() {
+    func rescan(full: Bool = false) {
         let trusted = AXIsProcessTrusted()
         if trusted && !isAccessibilityTrusted {
             // Just granted: hiding couldn't work until now, so apply it properly.
@@ -397,7 +411,7 @@ final class SectionManager: ObservableObject {
         isAccessibilityTrusted = trusted
         if trusted { MouseEvents.shared.retryTapIfNeeded() }
         scanQueue.async { [weak self] in
-            let found = MenuBarScanner.scan()
+            let found = MenuBarScanner.scan(full: full)
             Task { @MainActor in
                 guard let self, found != self.items else { return }
                 self.items = found
@@ -423,7 +437,7 @@ final class SectionManager: ObservableObject {
     /// A new app's icon lands wherever macOS puts it; under a native restriction it
     /// would be hidden just for being new. Treat unknown apps as Visible and re-apply.
     private func appLaunched(_ bundleID: String?) {
-        rescan()
+        rescan(full: true)
         guard method == .native, let restriction, let bundleID, !restriction.allowed.contains(bundleID) else { return }
         let known = items.contains { $0.bundleID == bundleID && itemSections[$0.id] != nil && itemSections[$0.id] != .visible }
         guard !known else { return }

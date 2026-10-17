@@ -83,19 +83,54 @@ enum MenuBarScanner {
     /// Our own process: Sleeve's control items are found by frame instead.
     private static let ownPID = ProcessInfo.processInfo.processIdentifier
 
-    static func scan() -> [MenuBarItem] {
+    /// An app that may own menu bar items, with what the scan needs to know about it.
+    private struct Owner {
+        let pid: pid_t
+        let bundleID: String?
+        let name: String
+    }
+
+    // Only touched from the (serial) scan queue; the lock is belt and braces.
+    private static let lock = NSLock()
+    nonisolated(unsafe) private static var knownOwners: [Owner] = []
+    nonisolated(unsafe) private static var lastFullScan = Date.distantPast
+
+    /// Reads every app's menu bar items.
+    ///
+    /// Asking every running app costs: over a hundred processes, two seconds of
+    /// Accessibility round-trips, most of them to background processes that can't have
+    /// an icon at all. So a full scan (apps that can show UI) runs at most once a minute,
+    /// or when asked (`full`, on an app launching or quitting); in between, only the
+    /// handful of apps that had icons last time are re-read.
+    static func scan(full: Bool = false) -> [MenuBarItem] {
         guard AXIsProcessTrusted() else { return [] }
         let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
         var items: [MenuBarItem] = []
         var overflowButton: CGRect?
 
-        for app in NSWorkspace.shared.runningApplications where app.processIdentifier != ownPID {
-            let appElement = AXUIElementCreateApplication(app.processIdentifier)
+        lock.lock()
+        let known = knownOwners
+        let doFull = full || known.isEmpty || Date().timeIntervalSince(lastFullScan) > 60
+        lock.unlock()
+
+        let owners: [Owner] = doFull
+            ? NSWorkspace.shared.runningApplications.compactMap { app in
+                // Background-only processes can't put anything in the menu bar.
+                guard app.processIdentifier != ownPID, app.activationPolicy != .prohibited else { return nil }
+                return Owner(pid: app.processIdentifier, bundleID: app.bundleIdentifier,
+                             name: app.localizedName ?? app.bundleIdentifier ?? "Unknown")
+            }
+            : known
+        var owning: [Owner] = []
+
+        for app in owners {
+            let appElement = AXUIElementCreateApplication(app.pid)
             // An app hung in its main thread would otherwise block the scan for 6 s.
             AXUIElementSetMessagingTimeout(appElement, 0.2)
 
             guard let extras: AXUIElement = appElement.attribute("AXExtrasMenuBar"),
                   let children: [AXUIElement] = extras.attribute(kAXChildrenAttribute) else { continue }
+            owning.append(app)
 
             for (index, child) in children.enumerated() {
                 guard let position: CGPoint = child.pointAttribute(kAXPositionAttribute),
@@ -106,7 +141,7 @@ enum MenuBarScanner {
                 // macOS 27's own "Show Hidden Menu Bar Items" chevron: the only button
                 // MenuBarAgent puts in the bar. It must never be hidden or covered,
                 // or icons macOS overflowed would become unreachable.
-                if app.bundleIdentifier == "com.apple.MenuBarAgent" && role == kAXButtonRole {
+                if app.bundleID == "com.apple.MenuBarAgent" && role == kAXButtonRole {
                     overflowButton = CGRect(x: position.x, y: primaryHeight - position.y - size.height,
                                             width: size.width, height: size.height)
                     continue
@@ -135,16 +170,22 @@ enum MenuBarScanner {
                                    y: primaryHeight - position.y - size.height,
                                    width: size.width,
                                    height: size.height)
-                let owner = app.localizedName ?? app.bundleIdentifier ?? "Unknown"
+                let owner = app.name
                 let key = identifier.isEmpty ? "\(index)|\(label)" : identifier
-                items.append(MenuBarItem(id: "\(app.bundleIdentifier ?? owner)|\(key)",
-                                         pid: app.processIdentifier,
+                items.append(MenuBarItem(id: "\(app.bundleID ?? owner)|\(key)",
+                                         pid: app.pid,
                                          ownerName: owner,
-                                         bundleID: app.bundleIdentifier,
+                                         bundleID: app.bundleID,
                                          label: label,
                                          frame: frame,
                                          element: target))
             }
+        }
+        if doFull {
+            lock.lock()
+            knownOwners = owning
+            lastFullScan = Date()
+            lock.unlock()
         }
         // Overflowed icons report a position on top of macOS's overflow button.
         if let overflowButton {
