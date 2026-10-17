@@ -14,7 +14,7 @@ final class AppEnvironment {
     let notch = NotchViewModel()
     let timer: PomodoroTimer
     let desktop: DesktopController
-    let updater = Updater(appName: "Spindle")
+    let updater = Updater(appName: "Spindle", repository: "zaineldinbarakat-droid/spindle")
 
     private init() {
         let player = PlayerManager()

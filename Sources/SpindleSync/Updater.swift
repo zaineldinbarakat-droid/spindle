@@ -1,9 +1,9 @@
 import AppKit
 
-/// Self-update for Spindle and Sleeve, from the project's GitHub repository.
+/// Self-update for Spindle and Sleeve, each from its own GitHub repository.
 ///
 /// The repo carries `updates/latest.json` (the newest version and its notes) next to
-/// a zip of each app. An app compares that version with its own; if it's newer, it
+/// a zip of the app. An app compares that version with its own; if it's newer, it
 /// offers to download its zip, checks the download really is the same app with an
 /// intact signature, swaps it in place of itself and relaunches.
 ///
@@ -11,8 +11,9 @@ import AppKit
 /// `./release.sh`, push — and both apps pick it up.
 @MainActor
 public final class Updater {
-    public static let repository = "zaineldinbarakat-droid/spindle-and-sleeve"
-    private static var rawBase: URL {
+    /// `owner/name` of the repository the app is published from.
+    public let repository: String
+    private var rawBase: URL {
         URL(string: "https://raw.githubusercontent.com/\(repository)/main/")!
     }
 
@@ -39,8 +40,9 @@ public final class Updater {
     private var isChecking = false
 
     /// `appName` is both the bundle name and the zip name: `updates/<appName>.zip`.
-    public init(appName: String) {
+    public init(appName: String, repository: String) {
         self.appName = appName
+        self.repository = repository
     }
 
     public var currentVersion: String {
@@ -87,7 +89,7 @@ public final class Updater {
     }
 
     private func fetchManifest() async throws -> Manifest {
-        var request = URLRequest(url: Self.rawBase.appendingPathComponent("updates/latest.json"))
+        var request = URLRequest(url: rawBase.appendingPathComponent("updates/latest.json"))
         request.cachePolicy = .reloadIgnoringLocalCacheData
         let (data, _) = try await URLSession.shared.data(for: request)
         return try JSONDecoder().decode(Manifest.self, from: data)
@@ -113,7 +115,7 @@ public final class Updater {
     // MARK: - Installing
 
     private func install() async throws {
-        let zipURL = Self.rawBase.appendingPathComponent("updates/\(appName).zip")
+        let zipURL = rawBase.appendingPathComponent("updates/\(appName).zip")
         let (downloaded, _) = try await URLSession.shared.download(from: zipURL)
 
         let work = FileManager.default.temporaryDirectory
