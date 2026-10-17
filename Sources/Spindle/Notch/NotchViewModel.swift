@@ -59,6 +59,12 @@ final class NotchViewModel: ObservableObject {
     @Published var tintNotch: Bool = Defaults.bool(.tintNotch, default: false) {
         didSet { Defaults.set(.tintNotch, tintNotch) }
     }
+    /// A soft glow of the album's colour behind the cover in the open notch. Off by
+    /// default: around the cover is simply the notch's own look (black, song colour or
+    /// glass), with nothing rising from behind it.
+    @Published var coverGlow: Bool = Defaults.bool(.coverGlow, default: false) {
+        didSet { Defaults.set(.coverGlow, coverGlow) }
+    }
     // MARK: Liquid Glass
 
     /// 0 = frosted (Apple's regular glass, blurred and dimmed for legibility) … 1 =

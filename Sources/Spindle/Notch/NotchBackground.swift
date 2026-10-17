@@ -36,7 +36,8 @@ struct NotchBackground: View {
             )
             .overlay(
                 shape.fill(
-                    RadialGradient(colors: [player.accent.opacity(isExpanded ? 0.32 : 0.18), .clear],
+                    // The light behind the cover: only with the cover glow on.
+                    RadialGradient(colors: [player.accent.opacity(viewModel.coverGlow ? (isExpanded ? 0.32 : 0.18) : 0), .clear],
                                    center: .init(x: 0.2, y: 0.65), startRadius: 4, endRadius: 300)
                 )
             )
@@ -56,7 +57,8 @@ struct NotchBackground: View {
                 )
                 .overlay(
                     shape.fill(
-                        RadialGradient(colors: [player.accent.opacity(0.3), .clear],
+                        // The light behind the cover: only with the cover glow on.
+                        RadialGradient(colors: [player.accent.opacity(viewModel.coverGlow ? 0.3 : 0), .clear],
                                        center: .init(x: 0.2, y: 0.7),
                                        startRadius: 4,
                                        endRadius: 280)

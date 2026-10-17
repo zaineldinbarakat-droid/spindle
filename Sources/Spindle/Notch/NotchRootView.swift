@@ -138,7 +138,7 @@ struct NotchRootView: View {
 
     private var playerBody: some View {
         HStack(alignment: .center, spacing: artworkStyle == .cover ? 18 : 10) {
-            DeckView(size: 124)
+            DeckView(size: 124, glow: viewModel.coverGlow)
 
             VStack(alignment: .leading, spacing: 10) {
                 TrackInfoView()
@@ -245,7 +245,8 @@ private struct CollapsedCover: View {
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: size * 0.24, style: .continuous)
         ZStack {
-            shape.fill(player.accent.opacity(0.35))
+            // Black under the artwork, so none of the album's colour shows at its edge.
+            shape.fill(player.artwork == nil ? Color(white: 0.2) : .black)
             if let artwork = player.artwork {
                 Image(nsImage: artwork)
                     .resizable()

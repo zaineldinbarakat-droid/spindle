@@ -12,6 +12,8 @@ struct BackdropView: View {
     @EnvironmentObject private var player: PlayerManager
     @EnvironmentObject private var timer: PomodoroTimer
     @AppStorage(ArtworkStyle.storageKey) private var style: ArtworkStyle = .vinyl
+    /// The focus timer card beside the record (Settings, or the Timer button here).
+    @AppStorage(Defaults.Key.fullScreenTimer.rawValue) private var showTimer = true
 
     var body: some View {
         GeometryReader { geo in
@@ -151,6 +153,12 @@ struct BackdropView: View {
                     .frame(maxWidth: 420)
                     .padding(.top, diameter * 0.04)
                 TransportControls()
+                if showTimer {
+                    FullScreenTimer()
+                        .frame(maxWidth: 420)
+                        .padding(.top, diameter * 0.06)
+                        .transition(.opacity.combined(with: .offset(y: 12)))
+                }
             } else {
                 PassiveProgress()
                     .frame(maxWidth: 420, maxHeight: 3)
@@ -171,7 +179,9 @@ struct BackdropView: View {
 
             Spacer()
 
-            if timer.isActive {
+            // The wallpaper version can't hold the card (it takes no clicks), so it keeps
+            // a quiet chip while a timer runs.
+            if !isInteractive && showTimer && timer.isActive {
                 HStack(spacing: 8) {
                     Image(systemName: timer.phase.symbol)
                     Text("\(timer.phase.title) · \(timer.remainingString)")
@@ -185,12 +195,164 @@ struct BackdropView: View {
             }
 
             if isInteractive {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.3)) { showTimer.toggle() }
+                } label: {
+                    Label(showTimer ? "Hide Timer" : "Timer", systemImage: "timer")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Theme.cream.opacity(0.45))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(Capsule().strokeBorder(Theme.cream.opacity(0.15)))
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .padding(.leading, 14)
                 Text("esc to exit")
                     .font(.system(size: 11))
                     .foregroundStyle(Theme.cream.opacity(0.3))
                     .padding(.leading, 14)
             }
         }
+    }
+}
+
+/// The focus timer on the full-screen turntable: a dark plate in the same cream and
+/// serif as the type beside the record. Idle, it offers the presets and a start
+/// button; running, it shows the phase, a big countdown, a ring filling in the phase's
+/// colour and the sessions done in this set.
+private struct FullScreenTimer: View {
+    @EnvironmentObject private var timer: PomodoroTimer
+
+    private var tint: Color { timer.isActive ? timer.phase.color : Theme.cream.opacity(0.65) }
+
+    private var caption: String {
+        guard timer.isActive else { return "FOCUS TIMER" }
+        let phase = timer.phase.title.uppercased()
+        return timer.isPaused ? "\(phase) · PAUSED" : phase
+    }
+
+    var body: some View {
+        HStack(spacing: 16) {
+            ring
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(caption)
+                    .font(.system(size: 10, weight: .bold))
+                    .kerning(2.4)
+                    .foregroundStyle(tint)
+                Text(timer.remainingString)
+                    .font(.system(size: 30, weight: .regular, design: .serif))
+                    .monospacedDigit()
+                    .contentTransition(.numericText(countsDown: true))
+                    .foregroundStyle(Theme.cream.opacity(timer.isRunning ? 0.95 : 0.6))
+                sessions
+            }
+
+            Spacer(minLength: 8)
+
+            if timer.isActive {
+                HStack(spacing: 10) {
+                    PlateButton(symbol: timer.isRunning ? "pause.fill" : "play.fill", prominent: true,
+                                help: timer.isRunning ? "Pause" : "Resume") { timer.toggle() }
+                    PlateButton(symbol: "forward.end.fill", help: "Skip to the next phase") { timer.skip() }
+                    PlateButton(symbol: "arrow.counterclockwise", help: "Reset") { timer.reset() }
+                }
+            } else {
+                HStack(spacing: 12) {
+                    PresetSwitch()
+                    PlateButton(symbol: "play.fill", prominent: true, help: "Start focusing") { timer.start() }
+                }
+            }
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 14)
+        .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(Color.black.opacity(0.3)))
+        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(Theme.cream.opacity(0.08)))
+        .animation(.easeInOut(duration: 0.35), value: timer.phase)
+        .animation(.easeInOut(duration: 0.35), value: timer.isActive)
+        .animation(.easeInOut(duration: 0.35), value: timer.isRunning)
+    }
+
+    private var ring: some View {
+        ZStack {
+            Circle().stroke(Theme.cream.opacity(0.12), lineWidth: 3)
+            Circle()
+                .trim(from: 0, to: timer.isActive ? timer.progress : 0)
+                .stroke(tint, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+                .animation(.linear(duration: 1), value: timer.progress)
+            Image(systemName: timer.phase.symbol)
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(tint)
+        }
+        .frame(width: 46, height: 46)
+    }
+
+    /// One dot per session in the set; filled ones are done.
+    private var sessions: some View {
+        HStack(spacing: 5) {
+            ForEach(0..<max(timer.sessionsBeforeLongBreak, 1), id: \.self) { index in
+                Circle()
+                    .fill(index < timer.sessionInSet ? Theme.focusColor : Theme.cream.opacity(0.18))
+                    .frame(width: 5, height: 5)
+            }
+        }
+        .padding(.top, 2)
+    }
+}
+
+/// 25/5 or 50/10 in one click, styled for the plate.
+private struct PresetSwitch: View {
+    @EnvironmentObject private var timer: PomodoroTimer
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(PomodoroTimer.Preset.all) { preset in
+                let selected = timer.currentPreset == preset
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) { timer.apply(preset) }
+                } label: {
+                    Text("\(preset.focus)/\(preset.shortBreak)")
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .lineLimit(1)
+                        .fixedSize()
+                        .foregroundStyle(selected ? Color.black : Theme.cream.opacity(0.6))
+                        .padding(.horizontal, 9)
+                        .frame(height: 24)
+                        .background(Capsule().fill(selected ? Theme.cream : Color.clear))
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .help(preset.name)
+            }
+        }
+        .padding(3)
+        .background(Capsule().fill(Theme.cream.opacity(0.08)))
+    }
+}
+
+private struct PlateButton: View {
+    var symbol: String
+    var prominent = false
+    var help: String
+    var action: () -> Void
+    @State private var isHovering = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: prominent ? 15 : 12, weight: .medium))
+                .foregroundStyle(Theme.cream)
+                .frame(width: prominent ? 38 : 32, height: prominent ? 38 : 32)
+                .background(Circle().fill(Theme.cream.opacity(prominent ? 0.16 : (isHovering ? 0.12 : 0.06))))
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .scaleEffect(isHovering ? 1.06 : 1)
+        .animation(.easeOut(duration: 0.15), value: isHovering)
+        .onHover { isHovering = $0 }
+        .help(help)
     }
 }
 

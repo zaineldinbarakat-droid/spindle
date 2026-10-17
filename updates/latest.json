@@ -1,5 +1,5 @@
 {
-  "version": "0.4.0",
-  "notes": "Sleeve: the two-finger-click menu opens instantly and stays smooth (it opens where you click instead of from the menu bar icon); hovering the menu bar works whichever app is in front; 12 new icon styles that go from empty to full (heart, star, moon, tray, battery, bolt, drop, leaf, flame, cloud, bulb, paw) plus Emoji: any emoji, grey while apps are hidden and full colour when they show, or a pair like 🌑 → 🌕.",
+  "version": "0.4.1",
+  "notes": "Spindle: no more album-colour glow or coloured edge behind the cover in the notch — around it is just the notch's own look (turn on 'Glow behind the album cover' to bring the glow back). The full-screen turntable has a focus timer beside the song: start it, switch 25/5 · 50/10, pause, skip and reset, with a ring and big countdown; hide it with the Timer button or in Settings.",
   "minimumSystemVersion": "14.0"
 }
