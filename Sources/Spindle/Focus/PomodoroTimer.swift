@@ -18,7 +18,7 @@ final class PomodoroTimer: ObservableObject {
 
         var title: String {
             switch self {
-            case .focus: return "Focus"
+            case .focus: return "Lock In"
             case .shortBreak: return "Short Break"
             case .longBreak: return "Long Break"
             }
@@ -290,13 +290,13 @@ final class PomodoroTimer: ObservableObject {
     private func postNotification(finished: Phase) {
         let content = UNMutableNotificationContent()
         if finished == .focus {
-            content.title = "Focus session done"
+            content.title = "Lock-in session done"
             content.body = phase == .longBreak
                 ? "Nice work — take a \(longBreakMinutes)-minute long break."
                 : "Take a \(shortBreakMinutes)-minute breather."
         } else {
             content.title = "Break's over"
-            content.body = "Back to it: \(focusMinutes) minutes of focus."
+            content.body = "Back to it: time to lock in for \(focusMinutes) minutes."
         }
         let request = UNNotificationRequest(identifier: "spindle.pomodoro",
                                             content: content,

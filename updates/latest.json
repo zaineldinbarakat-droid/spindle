@@ -1,5 +1,5 @@
 {
-  "version": "0.4.1",
-  "notes": "Spindle: no more album-colour glow or coloured edge behind the cover in the notch — around it is just the notch's own look (turn on 'Glow behind the album cover' to bring the glow back). The full-screen turntable has a focus timer beside the song: start it, switch 25/5 · 50/10, pause, skip and reset, with a ring and big countdown; hide it with the Timer button or in Settings.",
+  "version": "0.4.2",
+  "notes": "Spindle: the focus phase is now called Lock In — in the notch, the full-screen turntable, the menu and notifications.",
   "minimumSystemVersion": "14.0"
 }

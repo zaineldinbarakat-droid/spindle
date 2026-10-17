@@ -166,7 +166,7 @@ struct SettingsView: View {
                         Text("Custom").tag("custom")
                     }
                 }
-                Stepper("Focus: \(timer.focusMinutes) min", value: $timer.focusMinutes, in: 1...120)
+                Stepper("Lock in: \(timer.focusMinutes) min", value: $timer.focusMinutes, in: 1...120)
                 Stepper("Short break: \(timer.shortBreakMinutes) min", value: $timer.shortBreakMinutes, in: 1...60)
                 Stepper("Long break: \(timer.longBreakMinutes) min", value: $timer.longBreakMinutes, in: 1...90)
                 Stepper("Long break every \(timer.sessionsBeforeLongBreak) sessions",
@@ -174,7 +174,7 @@ struct SettingsView: View {
                 Toggle("Start the next phase automatically", isOn: $timer.autoStartNextPhase)
                 Toggle("Drop the notch open when a phase ends", isOn: $timer.peekNotchOnPhaseEnd)
                 Toggle("Pause music during breaks", isOn: $timer.pauseMusicOnBreak)
-                Toggle("Start music when focus begins", isOn: $timer.resumeMusicOnFocus)
+                Toggle("Start music when you lock in", isOn: $timer.resumeMusicOnFocus)
             }
 
             Section("Desktop") {
