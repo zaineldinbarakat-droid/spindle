@@ -1,5 +1,5 @@
 {
-  "version": "0.5.1",
-  "notes": "Spindle & Sleeve now live at github.com/zaineldinbarakat-droid/spindle-and-sleeve, each with its own page and download; updates come from the new address.",
+  "version": "0.6.0",
+  "notes": "Spindle now lives in its own repository (github.com/zaineldinbarakat-droid/spindle) and updates from it. Its companion, Sleeve, has its own; they still work together.",
   "minimumSystemVersion": "14.0"
 }

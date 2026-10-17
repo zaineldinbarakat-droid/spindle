@@ -1,8 +1,8 @@
-// Draws Spindle's and Sleeve's app icons and writes Packaging/<Name>.icns.
+// Draws Spindle's app icon and writes Packaging/Spindle.icns.
 //
 //   swift Packaging/make-icons.swift
 //
-// Both are drawn in code on the macOS icon grid — an 824 pt continuous-corner tile on
+// Drawn in code on the macOS icon grid — an 824 pt continuous-corner tile on
 // a 1024 pt canvas.
 import AppKit
 import SwiftUI
@@ -110,32 +110,6 @@ struct Tonearm: View {
     }
 }
 
-// MARK: - Sleeve: a menu bar, half tucked away
-
-/// Flat and quiet on purpose: a white menu-bar capsule with a divider — faded dots
-/// for the apps Sleeve keeps hidden, solid dots for the ones on show.
-struct SleeveIcon: View {
-    private let violet = Color(red: 0.42, green: 0.33, blue: 0.93)
-
-    var body: some View {
-        Tile(colors: [Color(red: 0.62, green: 0.55, blue: 1.00), Color(red: 0.38, green: 0.29, blue: 0.88)]) {
-            ZStack {
-                Capsule(style: .continuous)
-                    .fill(Color.white)
-                    .frame(width: 620, height: 190)
-                    .shadow(color: Color(red: 0.15, green: 0.1, blue: 0.45).opacity(0.35), radius: 30, y: 18)
-                HStack(spacing: 44) {
-                    Circle().fill(violet.opacity(0.22)).frame(width: 64, height: 64)
-                    Circle().fill(violet.opacity(0.22)).frame(width: 64, height: 64)
-                    Capsule().fill(violet.opacity(0.35)).frame(width: 10, height: 96)
-                    Circle().fill(violet).frame(width: 64, height: 64)
-                    Circle().fill(violet).frame(width: 64, height: 64)
-                }
-            }
-        }
-    }
-}
-
 // MARK: - Rendering
 
 @MainActor
@@ -172,7 +146,6 @@ func makeIcon<V: View>(_ view: V, name: String) throws {
 MainActor.assumeIsolated {
     do {
         try makeIcon(SpindleIcon(), name: "Spindle")
-        try makeIcon(SleeveIcon(), name: "Sleeve")
     } catch {
         print("error:", error)
     }

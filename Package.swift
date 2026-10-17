@@ -5,7 +5,8 @@ let package = Package(
     name: "Spindle",
     platforms: [.macOS(.v14)],
     targets: [
-        // The few types Spindle and Sleeve share to stay out of each other's way.
+        // Shared with Sleeve (github.com/zaineldinbarakat-droid/sleeve): the sync
+        // channel the two apps talk over, and the self-updater.
         .target(
             name: "SpindleSync",
             path: "Sources/SpindleSync",
@@ -15,22 +16,7 @@ let package = Package(
             name: "Spindle",
             dependencies: ["SpindleSync"],
             path: "Sources/Spindle",
-            exclude: ["README.md"],
             swiftSettings: [.swiftLanguageMode(.v5)]
-        ),
-        // macOS 27's menu bar visibility restriction (private framework, resolved
-        // at runtime). Objective-C so a changed API raises a catchable exception.
-        .target(
-            name: "MenuBarVisibility",
-            path: "Sources/MenuBarVisibility"
-        ),
-        .executableTarget(
-            name: "Sleeve",
-            dependencies: ["SpindleSync", "MenuBarVisibility"],
-            path: "Sources/Sleeve",
-            exclude: ["README.md"],
-            swiftSettings: [.swiftLanguageMode(.v5)],
-            linkerSettings: [.linkedFramework("Carbon"), .linkedFramework("IOKit")]
         )
     ]
 )

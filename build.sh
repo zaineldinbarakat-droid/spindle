@@ -1,5 +1,5 @@
 #!/bin/bash
-# Builds Spindle and Sleeve and assembles runnable .app bundles.
+# Builds Spindle and assembles a runnable Spindle.app.
 #
 # Requires Xcode (not just the Command Line Tools): SwiftUI's @State and friends are
 # macros in the macOS 26+ SDK, and libSwiftUIMacros.dylib ships only with Xcode.
@@ -11,7 +11,7 @@ BUILD_DIR="$ROOT/build"
 
 if ! xcodebuild -version >/dev/null 2>&1; then
     cat >&2 <<'MSG'
-error: Xcode is required to build Spindle and Sleeve.
+error: Xcode is required to build Spindle.
 
   SwiftUI property wrappers are macros in this SDK and the macro plugin
   (libSwiftUIMacros.dylib) is not part of the Command Line Tools.
@@ -42,7 +42,7 @@ assemble() {
     mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
     cp "$bin" "$app/Contents/MacOS/$name"
     cp "$plist" "$app/Contents/Info.plist"
-    # One version for both apps, from VERSION; the build number counts commits.
+    # The version comes from VERSION; the build number counts commits.
     /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $(cat "$ROOT/VERSION")" "$app/Contents/Info.plist"
     /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $(git -C "$ROOT" rev-list --count HEAD 2>/dev/null || echo 1)" "$app/Contents/Info.plist"
     printf 'APPL????' > "$app/Contents/PkgInfo"
@@ -54,7 +54,7 @@ assemble() {
 
     # Ad-hoc signature with an explicit designated requirement. By default an ad-hoc
     # signature's requirement is its cdhash, which changes on every build, so a
-    # privacy grant (Accessibility for Sleeve, Automation for Spindle) silently
+    # privacy grant (Automation, for Spindle) silently
     # stopped matching the next build — the switch in System Settings stayed on but
     # the app still wasn't trusted. Pinning the requirement to the bundle identifier
     # keeps one grant valid across rebuilds.
@@ -68,7 +68,6 @@ assemble() {
 }
 
 assemble Spindle "$ROOT/Packaging/Info.plist"
-assemble Sleeve "$ROOT/Packaging/Sleeve-Info.plist"
 
 echo
-echo "Run:   open \"$BUILD_DIR/Spindle.app\" \"$BUILD_DIR/Sleeve.app\""
+echo "Run:   open \"$BUILD_DIR/Spindle.app\""

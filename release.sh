@@ -1,10 +1,10 @@
 #!/bin/bash
-# Publishes an update that Spindle and Sleeve install themselves.
+# Publishes an update that Spindle installs itself.
 #
 #   ./release.sh 0.3.1 "Works with macOS 28: …"
 #
-# Bumps VERSION, builds both apps, zips them into updates/, and writes
-# updates/latest.json. Commit and push afterwards: the apps read both from the
+# Bumps VERSION, builds Spindle, zips it into updates/, and writes
+# updates/latest.json. Commit and push afterwards: the app reads both from the
 # repository's main branch (Settings → Updates, or automatically once a day).
 set -euo pipefail
 
@@ -16,7 +16,7 @@ echo "$VERSION_NUMBER" > "$ROOT/VERSION"
 "$ROOT/build.sh" release
 
 mkdir -p "$ROOT/updates"
-for app in Spindle Sleeve; do
+for app in Spindle; do
     rm -f "$ROOT/updates/$app.zip"
     # ditto keeps the bundle's signature, symlinks and attributes intact.
     /usr/bin/ditto -c -k --keepParent "$ROOT/build/$app.app" "$ROOT/updates/$app.zip"
