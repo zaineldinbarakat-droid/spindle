@@ -5,9 +5,11 @@ import SwiftUI
 
 /// Owns provider selection, polling and the scrub interaction.
 ///
-/// Polling runs at 1 Hz. Everything smoother than that (the progress bar, the spinning
-/// record) is interpolated from `positionAnchor`, so we get 120 fps motion out of one
-/// Apple Event per second.
+/// Spotify and Music announce every play, pause and track change, and those
+/// announcements drive the updates. Polling is only a safety net and a playhead
+/// re-sync: every 3 s while music plays, every 10 s otherwise (each poll is an Apple
+/// Event round-trip to the music app). Everything smoother than that (the progress bar,
+/// the spinning record) is interpolated from `positionAnchor`.
 @MainActor
 final class PlayerManager: ObservableObject {
 
@@ -36,6 +38,7 @@ final class PlayerManager: ObservableObject {
 
     private var activeProviderID: ProviderID = .appleMusic
     private var pollTimer: Timer?
+    private var isStarted = false
     private var observers: [NSObjectProtocol] = []
 
     /// Wall-clock reference for interpolating the playhead between polls.
@@ -55,16 +58,26 @@ final class PlayerManager: ObservableObject {
     // MARK: - Lifecycle
 
     func start() {
+        isStarted = true
         refreshAvailability()
         observeProviders()
         refresh()
-        pollTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+    }
+
+    /// The next safety-net poll, timed by what's happening: re-syncing the playhead of a
+    /// playing song matters; a paused or stopped player only needs an occasional look.
+    private func schedulePoll() {
+        pollTimer?.invalidate()
+        guard isStarted else { return }
+        let interval: TimeInterval = snapshot.isPlaying ? 3 : 10
+        pollTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: false) { [weak self] _ in
             Task { @MainActor in self?.refresh() }
         }
-        pollTimer?.tolerance = 0.2
+        pollTimer?.tolerance = interval * 0.25
     }
 
     func stop() {
+        isStarted = false
         pollTimer?.invalidate()
         pollTimer = nil
         observers.forEach { DistributedNotificationCenter.default().removeObserver($0) }
@@ -171,7 +184,8 @@ final class PlayerManager: ObservableObject {
 
             let result = chosen ?? firstIdle
             Task { @MainActor in
-                self.deniedProviders = denied
+                defer { self.schedulePoll() }
+                if self.deniedProviders != denied { self.deniedProviders = denied }
                 if let result {
                     self.apply(result)
                 } else if self.snapshot.hasTrack && !candidates.contains(where: { self.providers[$0]?.isRunning == true }) {

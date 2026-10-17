@@ -10,7 +10,16 @@ struct ProgressBar: View {
 
     private var height: CGFloat { isHovering || isDragging ? 6 : 3 }
 
+    /// Ticks once a second on its own: the player only publishes when something changes
+    /// (and re-syncs every few seconds), so the playhead and clock are advanced here,
+    /// from the interpolated position, only while the bar is on screen.
     var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { _ in
+            content
+        }
+    }
+
+    private var content: some View {
         VStack(spacing: 5) {
             GeometryReader { geo in
                 ZStack(alignment: .leading) {

@@ -212,7 +212,7 @@ struct SettingsView: View {
         switch notch.style {
         case .black: return "Pure black, one with the hardware notch."
         case .songColor: return "The open panel takes on the album's color; the notch itself stays black unless you allow it below."
-        case .liquidGlass: return "macOS's Liquid Glass, tinted with the album's color."
+        case .liquidGlass: return "macOS's Liquid Glass. Clear is see-through glass that bends the light at its edges; Frosted blurs what's behind it."
         }
     }
 }

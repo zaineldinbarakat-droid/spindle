@@ -159,6 +159,8 @@ final class NotchViewModel: ObservableObject {
     func expand() {
         guard state != .expanded, !isZenHidden else { return }
         withAnimation(.notch) { state = .expanded }
+        // The playhead is only re-synced every few seconds; opening is when it shows.
+        AppEnvironment.shared.player.refresh()
     }
 
     func collapse() {
