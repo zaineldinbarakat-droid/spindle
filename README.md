@@ -8,11 +8,11 @@
 
 <p align="center">
   <b>A retro turntable that lives in your MacBook's notch — and a menu bar manager that keeps everything around it tidy.</b><br>
-  Two native macOS apps, written from scratch in Swift, that work on their own and in sync.
+  Two native macOS apps, written from scratch in Swift and <b>made to work together</b> — each one just as good on its own.
 </p>
 
 <p align="center">
-  <a href="https://github.com/zaineldinbarakat-droid/spindle/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/zaineldinbarakat-droid/spindle?label=release&color=e8735b"></a>
+  <a href="https://github.com/zaineldinbarakat-droid/spindle-and-sleeve/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/zaineldinbarakat-droid/spindle-and-sleeve?label=release&color=e8735b"></a>
   <img alt="macOS 14+" src="https://img.shields.io/badge/macOS-14%2B-black?logo=apple">
   <img alt="Swift 6" src="https://img.shields.io/badge/Swift-6-F05138?logo=swift&logoColor=white">
   <img alt="SwiftUI + AppKit" src="https://img.shields.io/badge/UI-SwiftUI%20%2B%20AppKit-0A84FF">
@@ -22,8 +22,9 @@
 
 <p align="center">
   <a href="#download">Download</a> ·
-  <a href="#spindle">Spindle</a> ·
-  <a href="#sleeve">Sleeve</a> ·
+  <a href="Sources/Spindle/README.md">Spindle</a> ·
+  <a href="Sources/Sleeve/README.md">Sleeve</a> ·
+  <a href="#made-to-work-together">Together</a> ·
   <a href="#under-the-hood">Under the hood</a> ·
   <a href="#build-from-source">Build</a> ·
   <a href="CHANGELOG.md">Changelog</a>
@@ -44,12 +45,24 @@
 - 🪶 **Featherweight.** Idle, each app uses about **0.1 % CPU** and **15–30 MB** of memory; animations run on Core Animation, not the CPU.
 - 🔒 **Private by design.** No accounts, no tracking, no network calls except fetching cover art and checking this repo for updates.
 
+## Made to work together
+
+Spindle and Sleeve were designed as a pair. Run either one on its own, or both — they talk to each other and behave like a single product:
+
+- **They share the top of the screen politely.** Spindle tells Sleeve where its notch pill and panel are, and Sleeve keeps its hover zone and menu bar colouring out of that area — hovering the notch opens Spindle, never your hidden menu bar apps.
+- **One dropdown at a time.** Opening one app's panel closes the other's.
+- **Zen mode covers both**, for a completely clean top edge.
+- **The menu bar can match the music:** Sleeve's *Album* colour follows the song playing in Spindle.
+- **Tidy icons:** when Spindle starts, Sleeve makes room so its icon lands beside your other apps.
+
 ## Download
+
+Each app has its own download — get one or both.
 
 | App | What it is | Download |
 | --- | --- | --- |
-| <img src="Packaging/Spindle-icon.png" width="28"> **Spindle** | The notch music player and focus timer | [**Spindle.zip**](https://github.com/zaineldinbarakat-droid/spindle/releases/latest/download/Spindle.zip) |
-| <img src="Packaging/Sleeve-icon.png" width="28"> **Sleeve** | The menu bar manager | [**Sleeve.zip**](https://github.com/zaineldinbarakat-droid/spindle/releases/latest/download/Sleeve.zip) |
+| <img src="Packaging/Spindle-icon.png" width="28"> **Spindle** | The notch music player and focus timer · [read more](Sources/Spindle/README.md) | [**⬇︎ Spindle.zip**](https://github.com/zaineldinbarakat-droid/spindle-and-sleeve/releases/latest/download/Spindle.zip) |
+| <img src="Packaging/Sleeve-icon.png" width="28"> **Sleeve** | The menu bar manager · [read more](Sources/Sleeve/README.md) | [**⬇︎ Sleeve.zip**](https://github.com/zaineldinbarakat-droid/spindle-and-sleeve/releases/latest/download/Sleeve.zip) |
 
 **Requires** a Mac with Apple Silicon and macOS 14 Sonoma or later. Sleeve's native hiding needs macOS 27; Liquid Glass needs macOS 26.
 
@@ -88,6 +101,8 @@ Both apps **update themselves**: they check this repository once a day and offer
 - **Focus timer — "Lock In".** Pomodoro cycles with one-tap 25 / 5 ↔ 50 / 10, long breaks, a countdown in the closed notch, notifications, and optional pause-the-music-on-breaks.
 - **Desktop widgets and a full-screen turntable.** Live *Record* and *Turntable* widgets on the desktop, an optional animated wallpaper, and a full-screen scene (above) with the timer beside the song.
 
+**[Spindle's own page →](Sources/Spindle/README.md)**
+
 ## Sleeve
 
 <table>
@@ -104,6 +119,8 @@ Both apps **update themselves**: they check this repository once a day and offer
 - **Menu bar colour, the Ice way.** Solid colours, gradients you build by hand, palettes, an *Album* look that follows the song in Spindle, shapes, shadows and borders — with a live preview.
 - **20 icon styles** that go from empty to full as your apps appear — eye, heart, moon, tray, battery, … or **any emoji** (grey while hidden, full colour while showing).
 - **And more:** adjustable icon spacing, menu bar search (⌃⌥⌘S), Zen mode that clears the whole bar, rebindable hotkeys, and automation rules (battery, Wi-Fi network, Focus, or a script).
+
+**[Sleeve's own page →](Sources/Sleeve/README.md)**
 
 <p align="center">
   <img src="docs/images/sleeve-icons.png" width="49%" alt="Sleeve's icon styles">
@@ -140,8 +157,8 @@ Some of the more interesting engineering problems, and how they were solved:
 Requires **Xcode** (the SwiftUI macros ship only inside Xcode, so the Command Line Tools alone aren't enough).
 
 ```bash
-git clone https://github.com/zaineldinbarakat-droid/spindle.git
-cd spindle
+git clone https://github.com/zaineldinbarakat-droid/spindle-and-sleeve.git
+cd spindle-and-sleeve
 sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
 ./install.sh          # builds both apps and installs them in /Applications
 ```

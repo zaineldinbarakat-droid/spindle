@@ -15,6 +15,7 @@ let package = Package(
             name: "Spindle",
             dependencies: ["SpindleSync"],
             path: "Sources/Spindle",
+            exclude: ["README.md"],
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),
         // macOS 27's menu bar visibility restriction (private framework, resolved
@@ -27,6 +28,7 @@ let package = Package(
             name: "Sleeve",
             dependencies: ["SpindleSync", "MenuBarVisibility"],
             path: "Sources/Sleeve",
+            exclude: ["README.md"],
             swiftSettings: [.swiftLanguageMode(.v5)],
             linkerSettings: [.linkedFramework("Carbon"), .linkedFramework("IOKit")]
         )

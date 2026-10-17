@@ -1,5 +1,5 @@
 {
-  "version": "0.5.0",
-  "notes": "Both apps are now very light: idle Spindle ~0.1% CPU / 30 MB (it was using a third of a core), Sleeve ~0.1% / 15 MB. Spindle's playing indicator and spinning record run on Core Animation, polling is event-driven, and Sleeve only scans every app when something launches or quits. Spindle's Liquid Glass is now genuinely clear: see-through, with Apple's lensing edges, fading to frosted on the slider.",
+  "version": "0.5.1",
+  "notes": "Spindle & Sleeve now live at github.com/zaineldinbarakat-droid/spindle-and-sleeve, each with its own page and download; updates come from the new address.",
   "minimumSystemVersion": "14.0"
 }

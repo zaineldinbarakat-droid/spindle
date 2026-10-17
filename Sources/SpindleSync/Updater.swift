@@ -11,7 +11,7 @@ import AppKit
 /// `./release.sh`, push — and both apps pick it up.
 @MainActor
 public final class Updater {
-    public static let repository = "zaineldinbarakat-droid/spindle"
+    public static let repository = "zaineldinbarakat-droid/spindle-and-sleeve"
     private static var rawBase: URL {
         URL(string: "https://raw.githubusercontent.com/\(repository)/main/")!
     }

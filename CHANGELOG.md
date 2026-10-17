@@ -2,6 +2,10 @@
 
 All notable changes to Spindle and Sleeve. Both apps share one version number.
 
+## 0.5.1 — Spindle & Sleeve
+- The project is now **spindle-and-sleeve** on GitHub; both apps fetch their updates from the new address.
+- Each app has its own page and its own download, and both explain how they're made to work together.
+
 ## 0.5.0 — Lightweight, and genuinely clear glass
 - **Both apps are now very light.** Idle: Spindle ~0.1 % CPU / 30 MB (was a third of a CPU core), Sleeve ~0.1 % / 15 MB.
 - Spindle's playing indicator and spinning record run as Core Animation loops — no per-frame work in the app.
