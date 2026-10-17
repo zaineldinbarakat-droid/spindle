@@ -153,6 +153,9 @@ final class SectionManager: ObservableObject {
         settings.$toggleIcon.combineLatest(settings.$customIconData).sink { [weak self] _, _ in
             DispatchQueue.main.async { self?.updateIcons() }
         }.store(in: &cancellables)
+        settings.$emojiHidden.combineLatest(settings.$emojiShown).sink { [weak self] _, _ in
+            DispatchQueue.main.async { self?.updateIcons() }
+        }.store(in: &cancellables)
         // Sleeve's icon is always in the bar.
         toggleItem.isVisible = true
         updateDividerPresence()
@@ -392,6 +395,7 @@ final class SectionManager: ObservableObject {
             }
         }
         isAccessibilityTrusted = trusted
+        if trusted { MouseEvents.shared.retryTapIfNeeded() }
         scanQueue.async { [weak self] in
             let found = MenuBarScanner.scan()
             Task { @MainActor in
@@ -648,7 +652,7 @@ final class SectionManager: ObservableObject {
 
     // MARK: - Instant rehide
 
-    private var cursorMonitors: [Any] = []
+    private var cursorObservation: UUID?
     private var lastMenuCheck = Date.distantPast
     private var menuWasOpen = false
 
@@ -700,22 +704,13 @@ final class SectionManager: ObservableObject {
                 moved()
             }
         }
-        let moves: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDragged, .rightMouseDragged]
-        let clicks: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown]
-        if let global = NSEvent.addGlobalMonitorForEvents(matching: moves, handler: { _ in
-            Task { @MainActor in moved() }
-        }) { cursorMonitors.append(global) }
-        if let local = NSEvent.addLocalMonitorForEvents(matching: moves, handler: { event in
-            Task { @MainActor in moved() }
-            return event
-        }) { cursorMonitors.append(local) }
-        if let global = NSEvent.addGlobalMonitorForEvents(matching: clicks, handler: { _ in
-            Task { @MainActor in clicked() }
-        }) { cursorMonitors.append(global) }
-        if let local = NSEvent.addLocalMonitorForEvents(matching: clicks, handler: { event in
-            Task { @MainActor in clicked() }
-            return event
-        }) { cursorMonitors.append(local) }
+        cursorObservation = MouseEvents.shared.observe { kind in
+            switch kind {
+            case .moved: moved()
+            case .leftDown, .rightDown: clicked()
+            case .rightUp, .scrolled: break
+            }
+        }
         // A menu or popover closing doesn't move the cursor; check now and then.
         rehideTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: true) { [weak self] _ in
             Task { @MainActor in
@@ -754,8 +749,8 @@ final class SectionManager: ObservableObject {
     }
 
     private func stopWatchingCursor() {
-        cursorMonitors.forEach { NSEvent.removeMonitor($0) }
-        cursorMonitors.removeAll()
+        MouseEvents.shared.remove(cursorObservation)
+        cursorObservation = nil
         menuWasOpen = false
         isHeldByClick = false
         heldPID = nil
@@ -971,16 +966,32 @@ final class SectionManager: ObservableObject {
 
     private var lastMenuShown = Date.distantPast
 
-    /// Sleeve's options, dropped down from its icon. One click can arrive twice on
-    /// macOS 27 (global monitor and button), so a second request within 0.4 s is the
-    /// same click.
+    /// Sleeve's options, dropped down where the click was, like a context menu.
+    ///
+    /// Never hung from the status item: on macOS 27 a status item's menu is tracked
+    /// together with MenuBarAgent, which keeps asking the app for updates — and an app's
+    /// main thread is tied up while its menu is open, so every move through the menu
+    /// lagged. A menu placed by screen position involves only Sleeve.
+    ///
+    /// One click can arrive twice (event tap and button), so a second request within
+    /// 0.4 s of opening — or of closing — is the same click.
     func showMenu() {
         guard Date.now.timeIntervalSince(lastMenuShown) > 0.4, let menu = menuProvider?() else { return }
         lastMenuShown = .now
-        // Popped up directly, the same way from either home of the icon.
-        guard let anchor = iconAnchor else { return }
-        let below = anchor.isFlipped ? anchor.bounds.maxY + 4 : -4
-        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: below), in: anchor)
+        let mouse = NSEvent.mouseLocation
+        guard let screen = NSScreen.screens.first(where: { $0.frame.insetBy(dx: 0, dy: -2).contains(mouse) })
+                ?? NSScreen.main else { return }
+        let bar = MenuBarGeometry.strip(of: screen)
+        let x = MenuBarGeometry.isInMenuBar(mouse, margin: 6) ? mouse.x : (iconFrame?.minX ?? mouse.x)
+        // Out of whatever called this (the event tap, a button action) before the menu's
+        // own loop starts, so that caller isn't held open underneath it.
+        CFRunLoopPerformBlock(CFRunLoopGetMain(), CFRunLoopMode.defaultMode.rawValue) { [weak self] in
+            MainActor.assumeIsolated {
+                menu.popUp(positioning: nil, at: NSPoint(x: x - 6, y: bar.minY - 2), in: nil)
+                self?.lastMenuShown = .now
+            }
+        }
+        CFRunLoopWakeUp(CFRunLoopGetMain())
     }
 
     private var hintPopover: NSPopover?
@@ -1119,6 +1130,23 @@ final class SectionManager: ObservableObject {
         let animate = previous != nil && previous?.style == style && previous?.showing != showing
 
         switch style {
+        case .emoji:
+            // Empty, then full: the emoji waits in grey and fills with colour as the
+            // apps come out, with the same little bounce as the symbol icons.
+            iconView.alphaValue = 1
+            let image = EmojiFace.image(showing ? settings.emojiFaceShown : settings.emojiFaceHidden,
+                                        quiet: !showing)
+            if animate {
+                iconView.wantsLayer = true
+                let fade = CATransition()
+                fade.type = .fade
+                fade.duration = 0.18
+                iconView.layer?.add(fade, forKey: "face")
+                iconView.image = image
+                if showing { EmojiFace.bounce(iconView) }
+            } else {
+                iconView.image = image
+            }
         case .custom:
             let image = settings.customIconData.flatMap(NSImage.init(data:))
                 ?? NSImage(systemSymbolName: "questionmark.circle", accessibilityDescription: nil)

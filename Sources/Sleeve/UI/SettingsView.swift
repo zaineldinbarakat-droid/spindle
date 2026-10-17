@@ -249,7 +249,7 @@ private struct IconStylePicker: View {
     @EnvironmentObject private var settings: SleeveSettings
 
     var body: some View {
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 8) {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 5), spacing: 8) {
             ForEach(SleeveSettings.ToggleIcon.allCases) { style in
                 Button {
                     if style == .custom && settings.customIconData == nil {
@@ -280,12 +280,21 @@ private struct IconStylePicker: View {
         if settings.toggleIcon == .custom {
             Button("Choose Image…", action: chooseCustomImage)
         }
+        if settings.toggleIcon == .emoji {
+            EmojiFacesEditor()
+        }
     }
 
     @ViewBuilder
     private func face(_ style: SleeveSettings.ToggleIcon, showing: Bool) -> some View {
         let name = showing ? style.faces.shown : style.faces.hidden
         switch style {
+        case .emoji:
+            // Grey and quiet while hidden, full colour while showing — as in the bar.
+            Text(showing ? settings.emojiFaceShown : settings.emojiFaceHidden)
+                .font(.system(size: 13))
+                .grayscale(showing ? 0 : 1)
+                .opacity(showing ? 1 : 0.8)
         case .custom:
             if let data = settings.customIconData, let image = NSImage(data: data) {
                 Image(nsImage: image).resizable().frame(width: 16, height: 16).opacity(showing ? 1 : 0.5)
@@ -492,6 +501,79 @@ private struct SpacingControls: View {
         sections.holdRevealed(for: 8)
         let apps = MenuBarSpacing.appsToRelaunch(from: sections.items)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { MenuBarSpacing.relaunch(apps) }
+    }
+}
+
+/// The Emoji style: any emoji for each face, or a ready-made pair.
+private struct EmojiFacesEditor: View {
+    @EnvironmentObject private var settings: SleeveSettings
+
+    /// (hidden, showing) — mostly pairs that go from empty to full.
+    private static let picks: [(String, String)] = [
+        ("👀", ""), ("🌑", "🌕"), ("🤍", "❤️"), ("📭", "📬"), ("🪫", "🔋"), ("🥚", "🐣"),
+        ("🌱", "🌳"), ("🫙", "🍯"), ("🙈", "🐵"), ("✨", ""), ("🎧", ""), ("🫧", "")
+    ]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 14) {
+                EmojiBox(title: "Hidden", emoji: $settings.emojiHidden, placeholder: "👀")
+                Image(systemName: "arrow.right").font(.system(size: 10)).foregroundStyle(.tertiary)
+                EmojiBox(title: "Showing", emoji: $settings.emojiShown, placeholder: "Same")
+                Spacer()
+                Button("All Emoji…") { NSApp.orderFrontCharacterPalette(nil) }
+                    .help("Click a box first, then pick any emoji")
+            }
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 6), spacing: 6) {
+                ForEach(Self.picks, id: \.0) { hidden, shown in
+                    let selected = settings.emojiHidden == hidden && settings.emojiShown == shown
+                    Button {
+                        settings.emojiHidden = hidden
+                        settings.emojiShown = shown
+                    } label: {
+                        HStack(spacing: 3) {
+                            Text(hidden).grayscale(1).opacity(0.8)
+                            Image(systemName: "arrow.right").font(.system(size: 7)).foregroundStyle(.tertiary)
+                            Text(shown.isEmpty ? hidden : shown)
+                        }
+                        .font(.system(size: 13))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 5)
+                        .background(RoundedRectangle(cornerRadius: 7)
+                            .fill(selected ? Color.accentColor.opacity(0.18) : Color.primary.opacity(0.04)))
+                        .overlay(RoundedRectangle(cornerRadius: 7)
+                            .strokeBorder(selected ? Color.accentColor : .clear, lineWidth: 1.5))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            Text("Any emoji works: click a box, then pick one with All Emoji… (or 🌐 E). It waits in grey while your apps are hidden and fills with colour when they appear. Leave Showing empty to use the same emoji.")
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+/// One emoji in a small box; whatever is typed or picked, only the last emoji stays.
+private struct EmojiBox: View {
+    var title: String
+    @Binding var emoji: String
+    var placeholder: String
+
+    var body: some View {
+        VStack(spacing: 3) {
+            // No title: inside a Form a text field's title becomes a row label.
+            TextField("", text: Binding(
+                get: { emoji },
+                set: { emoji = SleeveSettings.lastEmoji(in: $0) }),
+                      prompt: Text(placeholder))
+                .labelsHidden()
+                .textFieldStyle(.roundedBorder)
+                .multilineTextAlignment(.center)
+                .font(.system(size: 15))
+                .frame(width: 54)
+            Text(title).font(.caption2).foregroundStyle(.secondary)
+        }
     }
 }
 

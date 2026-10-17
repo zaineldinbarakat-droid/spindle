@@ -83,8 +83,12 @@ of the screen.
   the bar keeps every icon where it is until it closes and the cursor leaves the bar.
   Hovering Spindle's notch never reveals anything.
 - **Two-finger click** anywhere on the menu bar (not on another app's icon) for Sleeve's
-  options: Show Hidden Apps, show/hide the menu bar apps, search, Zen mode, menu bar
-  color, settings and updates.
+  options, right where you clicked: Show Hidden Apps, show/hide the menu bar apps,
+  search, Zen mode, menu bar color, settings and updates.
+- **Works whichever app is in front.** Sleeve follows the cursor with a passive,
+  listen-only event tap, so hovering the bar works the same whether another app, Sleeve
+  itself or nothing has focus (macOS's ordinary event monitors only see events meant
+  for other apps).
 - **Its icon on the right.** macOS 27 adds every app's icon at the left end of the
   others and won't let an app choose its own spot, so Sleeve asks for one ⌘-drag: put
   its icon to the right of all your apps, beside Wi-Fi, and they appear to its left
@@ -95,8 +99,11 @@ of the screen.
   window of its own at a spot that never changes, with your apps appearing to its right.
 - **An icon with two faces,** like Ice's image sets, always in the bar: an outlined eye
   while your apps are tucked away; hover it and it morphs into the filled eye with a
-  little bounce as they come out, and morphs back when you move away. Or dot, ellipsis,
-  chevron, door, record, or your own image.
+  little bounce as they come out, and morphs back when you move away. Every style goes
+  from empty to full the same way: eye, dot, ellipsis, chevron, door, record, heart,
+  star, moon, tray, battery, bolt, drop, leaf, flame, cloud, bulb, paw — or **any
+  emoji**, which waits in grey while your apps are hidden and fills with colour when
+  they appear (one emoji, or a pair such as 🌑 → 🌕, 📭 → 📬, 🥚 → 🐣) — or your own image.
 - **Three sections** (with hide-all off). Visible, Hidden and Always Hidden, separated by Sleeve's toggle and
   two faint │ dividers. ⌘-drag icons across the dividers. On macOS 14–26 you can also
   drag them between the columns in *Settings → Layout* and Sleeve performs the ⌘-drag

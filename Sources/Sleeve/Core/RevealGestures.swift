@@ -10,7 +10,7 @@ final class RevealGestures {
     private unowned let sections: SectionManager
     private unowned let spindle: SpindleBridge
     private let settings = SleeveSettings.shared
-    private var monitors: [Any] = []
+    private var observation: UUID?
     private var appMenusEnd: CGFloat = 0
     private var lastScrollToggle = Date.distantPast
 
@@ -22,21 +22,20 @@ final class RevealGestures {
         self.sections = sections
         self.spindle = spindle
 
-        monitors.append(NSEvent.addGlobalMonitorForEvents(matching: .mouseMoved) { [weak self] _ in
-            Task { @MainActor in self?.mouseMoved() }
-        } as Any)
-        monitors.append(NSEvent.addGlobalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
-            let dy = event.scrollingDeltaY
-            Task { @MainActor in self?.scrolled(dy) }
-        } as Any)
-        monitors.append(NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDown) { [weak self] _ in
-            Task { @MainActor in self?.clicked() }
-        } as Any)
-        // On release, not press: a menu opened on the press is closed again by the
-        // release that follows a moment later — it flashed up and vanished.
-        monitors.append(NSEvent.addGlobalMonitorForEvents(matching: .rightMouseUp) { [weak self] _ in
-            Task { @MainActor in self?.twoFingerClicked() }
-        } as Any)
+        // Every mouse event, whichever app is in front (see MouseEvents), handled
+        // straight away rather than queued behind other work.
+        observation = MouseEvents.shared.observe { [weak self] kind in
+            guard let self else { return }
+            switch kind {
+            case .moved: self.mouseMoved()
+            case .scrolled(let dy): self.scrolled(dy)
+            case .leftDown: self.clicked()
+            // On release, not press: a menu opened on the press is closed again by
+            // the release that follows a moment later — it flashed up and vanished.
+            case .rightUp: self.twoFingerClicked()
+            case .rightDown: break
+            }
+        }
 
         NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
@@ -165,7 +164,7 @@ final class RevealGestures {
     }
 
     func tearDown() {
-        monitors.forEach { NSEvent.removeMonitor($0) }
-        monitors.removeAll()
+        MouseEvents.shared.remove(observation)
+        observation = nil
     }
 }

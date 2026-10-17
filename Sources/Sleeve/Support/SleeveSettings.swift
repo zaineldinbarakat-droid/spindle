@@ -19,6 +19,9 @@ final class SleeveSettings: ObservableObject {
     enum ToggleIcon: String, CaseIterable, Identifiable, Codable {
         case eye, dot, ellipsis, chevron, door
         case record = "sleeve"
+        case heart, star, moon, tray, battery, bolt, drop, leaf, flame, cloud, lightbulb, paw
+        /// Any emoji: grey while apps are hidden, full colour while they show.
+        case emoji = "emojiFaces"
         case custom
         var id: String { rawValue }
         var title: String {
@@ -29,6 +32,19 @@ final class SleeveSettings: ObservableObject {
             case .chevron: return "Chevron"
             case .door: return "Door"
             case .record: return "Record"
+            case .heart: return "Heart"
+            case .star: return "Star"
+            case .moon: return "Moon"
+            case .tray: return "Tray"
+            case .battery: return "Battery"
+            case .bolt: return "Bolt"
+            case .drop: return "Drop"
+            case .leaf: return "Leaf"
+            case .flame: return "Flame"
+            case .cloud: return "Cloud"
+            case .lightbulb: return "Bulb"
+            case .paw: return "Paw"
+            case .emoji: return "Emoji"
             case .custom: return "Custom Image"
             }
         }
@@ -42,7 +58,19 @@ final class SleeveSettings: ObservableObject {
             case .chevron: return ("chevron.compact.left", "chevron.compact.right")
             case .door: return ("door.left.hand.closed", "door.left.hand.open")
             case .record: return ("smallcircle.filled.circle", "opticaldisc")
-            case .custom: return ("", "")
+            case .heart: return ("heart", "heart.fill")
+            case .star: return ("star", "star.fill")
+            case .moon: return ("moon", "moon.fill")
+            case .tray: return ("tray", "tray.full.fill")
+            case .battery: return ("battery.0percent", "battery.100percent")
+            case .bolt: return ("bolt", "bolt.fill")
+            case .drop: return ("drop", "drop.fill")
+            case .leaf: return ("leaf", "leaf.fill")
+            case .flame: return ("flame", "flame.fill")
+            case .cloud: return ("cloud", "cloud.fill")
+            case .lightbulb: return ("lightbulb", "lightbulb.fill")
+            case .paw: return ("pawprint", "pawprint.fill")
+            case .emoji, .custom: return ("", "")
             }
         }
     }
@@ -75,6 +103,10 @@ final class SleeveSettings: ObservableObject {
     @Published var revealOnTwoFingerClick: Bool { didSet { save(revealOnTwoFingerClick, "revealOnTwoFingerClick") } }
     /// PNG for the Custom icon style, scaled to menu bar size.
     @Published var customIconData: Data? { didSet { store.set(customIconData, forKey: "customIconData") } }
+    /// The Emoji style's face while apps are hidden (drawn in grey).
+    @Published var emojiHidden: String { didSet { save(emojiHidden, "emojiHidden") } }
+    /// Its face while they show (in colour); empty means the same emoji.
+    @Published var emojiShown: String { didSet { save(emojiShown, "emojiShown") } }
     @Published var revealOnScroll: Bool { didSet { save(revealOnScroll, "revealOnScroll") } }
     @Published var revealOnEmptyClick: Bool { didSet { save(revealOnEmptyClick, "revealOnEmptyClick") } }
     @Published var rehideMode: RehideMode { didSet { save(rehideMode.rawValue, "rehideMode") } }
@@ -192,6 +224,8 @@ final class SleeveSettings: ObservableObject {
         revealOnIconHover = bool("revealOnIconHover", true)
         fixedIcon = bool("fixedIcon", false)
         customIconData = d.data(forKey: "customIconData")
+        emojiHidden = d.string(forKey: "emojiHidden") ?? "👀"
+        emojiShown = d.string(forKey: "emojiShown") ?? ""
         revealOnHover = bool("revealOnHover", true)
         revealOnScroll = bool("revealOnScroll", true)
         revealOnEmptyClick = bool("revealOnEmptyClick", false)
