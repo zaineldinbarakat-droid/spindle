@@ -62,7 +62,16 @@ struct SettingsView: View {
                 Toggle("Show the playing indicator in the closed notch", isOn: $notch.showVisualizer)
                 Toggle("Show the waves in the open panel, beside the controls", isOn: $notch.panelWaves)
                 Toggle("React to the music", isOn: $notch.liveWaves)
-                Text("The waves move with the song's actual sound instead of a steady rhythm. macOS asks once to let Spindle hear the audio your Mac plays — it only measures how loud the music is; nothing is recorded or saved.")
+                if notch.liveWaves {
+                    LabeledContent("Expression") {
+                        HStack {
+                            Text("Calm").font(.caption).foregroundStyle(.secondary)
+                            Slider(value: $notch.waveIntensity, in: 0...1)
+                            Text("Wild").font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                Text("The waves move with the song's actual sound — bass on the left, treble on the right. Loud hits make them jump and glow, high notes make the right side leap; Expression sets how dramatic it gets. macOS asks once to let Spindle hear the audio your Mac plays — it only measures how loud the music is; nothing is recorded or saved.")
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 if notch.liveWaves, let failure = AudioLevels.shared.failure {

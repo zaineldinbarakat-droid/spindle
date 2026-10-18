@@ -231,6 +231,13 @@ final class NotchViewModel: ObservableObject {
     @Published var panelWaves: Bool = Defaults.bool(.panelWaves, default: true) {
         didSet { Defaults.set(.panelWaves, panelWaves) }
     }
+    /// How dramatic live waves are: 0 calm … 1 wild.
+    @Published var waveIntensity: Double = Defaults.double(.waveIntensity, default: 0.6) {
+        didSet {
+            Defaults.set(.waveIntensity, waveIntensity)
+            AudioLevels.shared.intensity = Float(waveIntensity)
+        }
+    }
     /// Waves that move with the song's actual sound (system audio, with permission).
     @Published var liveWaves: Bool = Defaults.bool(.liveWaves, default: false) {
         didSet {

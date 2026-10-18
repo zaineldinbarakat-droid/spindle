@@ -235,7 +235,7 @@ final class RadianceLayerView: NSView {
 
     private func updateSubscription() {
         if isLive, subscription == nil {
-            subscription = AudioLevels.shared.subscribe { [weak self] levels in self?.show(levels) }
+            subscription = AudioLevels.shared.subscribe { [weak self] levels, punch in self?.show(levels, punch: punch) }
             // The tap may have just failed to start (no permission): use the loops then.
             if AudioLevels.shared.failure != nil {
                 AudioLevels.shared.unsubscribe(subscription)
@@ -257,7 +257,7 @@ final class RadianceLayerView: NSView {
     }
 
     /// One frame of real levels: each bar takes the bands under it.
-    private func show(_ bands: [Float]) {
+    private func show(_ bands: [Float], punch: Float) {
         // macOS stopped sharing the sound: back to the usual rhythm.
         if AudioLevels.shared.failure != nil {
             updateSubscription()
@@ -277,18 +277,19 @@ final class RadianceLayerView: NSView {
         CATransaction.begin()
         CATransaction.setAnimationDuration(1.0 / 30.0)
         CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .linear))
-        halo.opacity = Float(glow * (0.3 + 0.6 * energy))
+        // A loud hit flashes the glow.
+        halo.opacity = Float(glow * min(0.25 + 0.5 * energy + 0.6 * Double(punch), 1.2))
         switch style ?? .bars {
         case .bars:
             for (index, bar) in bars.enumerated() {
-                let shaped = values[index] * (0.65 + 0.35 * envelope[index])
+                let shaped = values[index] * (0.7 + 0.3 * envelope[index])
                 bar.bounds.size.height = placement.restHeight + (placement.peakHeight - placement.restHeight) * CGFloat(shaped)
             }
         case .wave:
             let t = CACurrentMediaTime()
-            waveLine.path = wavePath(t: t, amplitude: 0.05 + 0.4 * energy)
+            waveLine.path = wavePath(t: t, amplitude: min(0.05 + 0.38 * energy + 0.2 * Double(punch), 0.55))
         case .pulse:
-            let beat = min(values.first ?? 0, 1) * 0.6 + energy * 0.4
+            let beat = min(min(values.first ?? 0, 1) * 0.5 + energy * 0.3 + Double(punch) * 0.5, 1.2)
             ring.transform = CATransform3DMakeScale(1 + beat, 1 + beat, 1)
             ring.opacity = Float(1 - beat * 0.8)
             dot.transform = CATransform3DMakeScale(1 + beat * 0.15, 1 + beat * 0.15, 1)

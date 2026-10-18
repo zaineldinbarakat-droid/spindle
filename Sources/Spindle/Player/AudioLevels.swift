@@ -13,21 +13,34 @@ import CoreAudio
 final class AudioLevels {
     static let shared = AudioLevels()
 
-    /// Bands from bass to treble, each 0…1. Smoothed: quick to rise, slower to fall.
+    /// Bands from bass to treble, each 0…1 (a little over on a big moment). Smoothed:
+    /// quick to rise, slower to fall.
     private(set) var bands: [Float] = Array(repeating: 0, count: AudioLevels.bandCount)
     nonisolated static let bandCount = 16
+    /// A loud hit right now — a drum, a drop — from 0 (steady) to 1, for a flash of glow.
+    private(set) var punch: Float = 0
+    /// 0 (calm) … 1 (wild): how much loud moments and high notes are exaggerated.
+    var intensity: Float = Float(Defaults.double(.waveIntensity, default: 0.6))
+
+    // Each band's recent range, so every song — quiet or loud, bass-heavy or bright —
+    // fills the bars, and what stands out is what's changing.
+    private var peaks = [Float](repeating: 0.25, count: AudioLevels.bandCount)
+    private var floors = [Float](repeating: 0, count: AudioLevels.bandCount)
+    private var bandAverages = [Float](repeating: 0, count: AudioLevels.bandCount)
+    private var energyAverage: Float = 0
 
     /// Whether the tap is up and delivering sound.
     private(set) var isRunning = false
     /// Set when macOS refused (no permission, or the API is missing).
     private(set) var failure: String?
 
-    private var subscribers: [UUID: ([Float]) -> Void] = [:]
+    private var subscribers: [UUID: ([Float], Float) -> Void] = [:]
     private var ticker: Timer?
     private var tap: AnyObject?
 
-    /// Calls `handler` about 30 times a second with fresh levels while it's subscribed.
-    func subscribe(_ handler: @escaping ([Float]) -> Void) -> UUID {
+    /// Calls `handler` about 30 times a second with fresh levels (bands, punch) while
+    /// it's subscribed.
+    func subscribe(_ handler: @escaping ([Float], Float) -> Void) -> UUID {
         let id = UUID()
         subscribers[id] = handler
         update()
@@ -77,7 +90,8 @@ final class AudioLevels {
         tap = nil
         isRunning = false
         bands = Array(repeating: 0, count: Self.bandCount)
-        for handler in subscribers.values { handler(bands) }
+        punch = 0
+        for handler in subscribers.values { handler(bands, punch) }
     }
 
     private var latest: [Float]?
@@ -102,15 +116,40 @@ final class AudioLevels {
         }
     }
 
-    /// Smooths toward the newest levels and hands them out.
+    /// Turns the newest levels into motion that talks back to the song, and hands it
+    /// out: each band is read against its own recent range, the contrast is stretched
+    /// so quiet passages sit low and loud ones reach high, and sudden changes are
+    /// exaggerated — a loud hit lifts every bar and flashes the glow, a high note makes
+    /// the treble bars on the right leap.
     private func tick() {
-        let target = latest ?? Array(repeating: 0, count: Self.bandCount)
+        let raw = latest ?? Array(repeating: 0, count: Self.bandCount)
+        let intensity = min(max(self.intensity, 0), 1)
+
+        let energy = raw.reduce(0, +) / Float(raw.count)
+        energyAverage = energyAverage * 0.97 + energy * 0.03
+        let onset = max(0, energy / max(energyAverage, 0.02) - 1)
+        punch = max(punch * 0.85, min(onset * 1.6, 1))
+
+        let contrast = 1 + 0.9 * intensity
         for index in bands.indices {
-            let value = target[index]
+            let level = raw[index]
+            peaks[index] = max(level, peaks[index] * 0.996)
+            floors[index] = min(level, floors[index] + 0.0015)
+            let span = max(peaks[index] - floors[index], 0.12)
+            // Steady music sits around the middle, leaving headroom for the big moments.
+            var value = pow(min(max((level - floors[index]) / span, 0), 1) * 0.8, contrast)
+
+            bandAverages[index] = bandAverages[index] * 0.94 + level * 0.06
+            let bandOnset = max(0, level / max(bandAverages[index], 0.02) - 1)
+            // Treble jumps count for more: high notes carry little energy but catch the eye.
+            let trebleWeight = 0.8 + 0.8 * Float(index) / Float(bands.count - 1)
+            value *= 1 + intensity * (0.9 * onset + 1.1 * bandOnset * trebleWeight)
+            value = min(value, 1.15)
+
             // Rise fast, fall gently — how a VU meter reads.
-            bands[index] = value > bands[index] ? value : bands[index] * 0.82 + value * 0.18
+            bands[index] = value > bands[index] ? value : bands[index] * 0.8 + value * 0.2
         }
-        for handler in subscribers.values { handler(bands) }
+        for handler in subscribers.values { handler(bands, punch) }
     }
 }
 

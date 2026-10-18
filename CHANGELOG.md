@@ -2,6 +2,10 @@
 
 All notable changes to Spindle.
 
+## 0.6.4 — Waves that talk back
+- With *React to the music* on, the waves now exaggerate what the song does: loud hits make every bar jump and the glow flash, high notes make the treble bars on the right leap, and each song is read against its own range so quiet tracks move too.
+- **Expression** slider, from Calm to Wild.
+
 ## 0.6.3 — The song's waves
 - **Waves in the open panel**, beside the controls, like Vinylpod — the same look as the closed notch's indicator, larger.
 - **React to the music:** the waves can move with the song's actual sound — a private system-audio tap, a quick FFT and 16 bands from bass to treble. Off by default; macOS asks first, and nothing is recorded.
