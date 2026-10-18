@@ -49,6 +49,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
 
             installStatusItem()
             environment.updater.checkInBackgroundIfDue()
+            // Live waves are on by default: ask for the audio permission up front.
+            if environment.notch.liveWaves { AudioLevels.shared.askForPermissionOnce() }
         }
     }
 

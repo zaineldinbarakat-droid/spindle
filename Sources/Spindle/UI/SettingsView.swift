@@ -323,6 +323,10 @@ private struct PanelSettings: View {
             }
             .pickerStyle(.segmented)
             .onChange(of: notch.motion) { _, _ in previewBriefly(true) }
+            Text(notch.motion == .macOS
+                 ? "Opens like a macOS menu or popover: a quick, clean grow and fade."
+                 : "Springier than macOS's own pop-ups — Bouncy most of all.")
+                .font(.caption).foregroundStyle(.secondary)
 
             slider("Closing", value: $notch.closeDelay, in: NotchViewModel.closeDelayRange,
                    low: "Instantly", high: "Relaxed", readout: { String(format: "%.2f s", $0) })
@@ -335,12 +339,12 @@ private struct PanelSettings: View {
                 Button("Reset All") {
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
                         notch.apply(.standard)
-                        notch.motion = .smooth
+                        notch.motion = .macOS
                         notch.closeDelay = 0.08
                     }
                     previewBriefly(false)
                 }
-                .disabled(notch.currentPreset == .standard && notch.motion == .smooth && abs(notch.closeDelay - 0.08) < 0.005)
+                .disabled(notch.currentPreset == .standard && notch.motion == .macOS && abs(notch.closeDelay - 0.08) < 0.005)
             }
         } header: {
             Text("Panel")

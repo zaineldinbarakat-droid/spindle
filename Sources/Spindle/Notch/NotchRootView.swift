@@ -51,14 +51,14 @@ struct NotchRootView: View {
                         .frame(width: expandedSize.width, height: expandedSize.height, alignment: .top)
                         .transition(.asymmetric(
                             // Resolves out of a blur just behind the growing shape.
-                            insertion: .islandContentIn.animation(.spring(duration: 0.42, bounce: 0.08).delay(0.06)),
-                            removal: .islandContentIn.animation(.easeIn(duration: 0.12))
+                            insertion: .islandContentIn.animation(viewModel.motion.contentIn),
+                            removal: .islandContentIn.animation(viewModel.motion.contentOut)
                         ))
                 } else {
                     collapsedContent
                         .frame(width: collapsedSize.width, height: collapsedSize.height)
                         .transition(.asymmetric(
-                            insertion: .islandContentIn.animation(.spring(duration: 0.35, bounce: 0).delay(0.14)),
+                            insertion: .islandContentIn.animation(viewModel.motion.pillIn),
                             removal: .islandContentIn.animation(.easeIn(duration: 0.08))
                         ))
                 }

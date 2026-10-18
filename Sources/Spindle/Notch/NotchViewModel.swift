@@ -239,7 +239,7 @@ final class NotchViewModel: ObservableObject {
         }
     }
     /// Waves that move with the song's actual sound (system audio, with permission).
-    @Published var liveWaves: Bool = Defaults.bool(.liveWaves, default: false) {
+    @Published var liveWaves: Bool = Defaults.bool(.liveWaves, default: true) {
         didSet {
             Defaults.set(.liveWaves, liveWaves)
             if liveWaves { AudioLevels.shared.retry() }

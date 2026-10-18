@@ -26,6 +26,7 @@ enum Defaults {
         case panelWaves
         case liveWaves
         case waveIntensity
+        case askedForAudio
         case coverGlow
 
         // Focus timer

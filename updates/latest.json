@@ -1,5 +1,5 @@
 {
-  "version": "0.6.4",
-  "notes": "With React to the music on, the waves exaggerate what the song does: loud hits make them jump and glow, high notes make the right side leap. New Expression slider, from Calm to Wild.",
+  "version": "0.6.5",
+  "notes": "Crisper, smoother waves. React to the music is on by default (Spindle asks for the audio permission at first start). New macOS motion: the notch opens like any macOS pop-up.",
   "minimumSystemVersion": "14.0"
 }

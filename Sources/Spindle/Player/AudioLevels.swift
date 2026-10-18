@@ -98,6 +98,15 @@ final class AudioLevels {
     /// Analysis windows in a row that were exact digital silence.
     private var silentStreak = 0
 
+    /// The first time Spindle runs with live waves on, listen for a moment so macOS
+    /// asks for permission right away — not later, in the middle of a song.
+    func askForPermissionOnce() {
+        guard !Defaults.bool(.askedForAudio, default: false) else { return }
+        Defaults.set(.askedForAudio, true)
+        let probe = subscribe { _, _ in }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in self?.unsubscribe(probe) }
+    }
+
     /// Try again after the user changed something (e.g. turned the setting back on).
     func retry() {
         failure = nil
@@ -113,6 +122,9 @@ final class AudioLevels {
         if silentStreak > 140 {
             failure = "macOS isn't sharing the sound with Spindle — allow it under Privacy & Security → Screen & System Audio Recording."
             stop()
+            // It might just have been a long pause in the music: look again later
+            // (the waves pick it up on the next play or pause).
+            DispatchQueue.main.asyncAfter(deadline: .now() + 20) { [weak self] in self?.retry() }
         }
     }
 

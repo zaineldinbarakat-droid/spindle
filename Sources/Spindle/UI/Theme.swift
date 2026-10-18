@@ -79,17 +79,21 @@ extension Animation {
 
 /// How the panel springs open and tucks away (Settings → Panel → Motion).
 enum NotchMotion: String, CaseIterable, Identifiable {
+    /// Like the rest of macOS — a menu or popover: a quick, clean grow and fade, no
+    /// overshoot. The default.
+    case macOS
     case snappy, smooth, bouncy
 
     var id: String { rawValue }
-    var title: String { rawValue.capitalized }
+    var title: String { self == .macOS ? "macOS" : rawValue.capitalized }
 
     static var current: NotchMotion {
-        NotchMotion(rawValue: Defaults.string(.notchMotion) ?? "") ?? .smooth
+        NotchMotion(rawValue: Defaults.string(.notchMotion) ?? "") ?? .macOS
     }
 
     var open: Animation {
         switch self {
+        case .macOS: return .spring(duration: 0.24, bounce: 0)
         case .snappy: return .spring(duration: 0.3, bounce: 0.04)
         case .smooth: return .spring(duration: 0.45, bounce: 0.12)
         case .bouncy: return .spring(duration: 0.55, bounce: 0.3)
@@ -98,10 +102,28 @@ enum NotchMotion: String, CaseIterable, Identifiable {
 
     var close: Animation {
         switch self {
+        case .macOS: return .easeIn(duration: 0.16)
         case .snappy: return .spring(duration: 0.24, bounce: 0)
         case .smooth: return .spring(duration: 0.38, bounce: 0.04)
         case .bouncy: return .spring(duration: 0.44, bounce: 0.14)
         }
+    }
+
+    /// The open panel's content arriving behind the growing shape.
+    var contentIn: Animation {
+        switch self {
+        case .macOS: return .easeOut(duration: 0.18).delay(0.03)
+        case .snappy: return .spring(duration: 0.28, bounce: 0).delay(0.03)
+        case .smooth: return .spring(duration: 0.42, bounce: 0.08).delay(0.06)
+        case .bouncy: return .spring(duration: 0.5, bounce: 0.2).delay(0.06)
+        }
+    }
+
+    var contentOut: Animation { self == .macOS ? .easeIn(duration: 0.1) : .easeIn(duration: 0.12) }
+
+    /// The closed pill's content coming back once the panel has tucked away.
+    var pillIn: Animation {
+        self == .macOS ? .easeOut(duration: 0.2).delay(0.1) : .spring(duration: 0.35, bounce: 0).delay(0.14)
     }
 }
 

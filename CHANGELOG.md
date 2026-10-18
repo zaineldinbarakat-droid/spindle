@@ -2,6 +2,11 @@
 
 All notable changes to Spindle.
 
+## 0.6.5 — Crisper waves, macOS motion
+- **Crisper, smoother waves:** bars sit on whole pixels (fractional positions blurred their edges), the glow is tighter, and live levels glide from frame to frame instead of stepping.
+- **React to the music is on by default**, and Spindle asks for the audio permission when it first starts — not in the middle of a song.
+- **macOS motion** (the new default): the notch opens like any macOS menu or popover — a quick, clean grow and fade. Snappy, Smooth and Bouncy are still there.
+
 ## 0.6.4 — Waves that talk back
 - With *React to the music* on, the waves now exaggerate what the song does: loud hits make every bar jump and the glow flash, high notes make the treble bars on the right leap, and each song is read against its own range so quiet tracks move too.
 - **Expression** slider, from Calm to Wild.

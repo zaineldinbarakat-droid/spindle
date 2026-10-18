@@ -22,12 +22,14 @@ struct RadianceView: View {
         /// Beside the controls in the open panel.
         case panel
 
+        // Whole-point bar widths and gaps, so every bar sits on the pixel grid with
+        // crisp edges (fractional positions were what made the waves look hazy).
         var size: CGSize { self == .notch ? CGSize(width: 36, height: 18) : CGSize(width: 96, height: 30) }
         var barCount: Int { self == .notch ? 5 : 11 }
-        var barWidth: CGFloat { self == .notch ? 3 : 3.5 }
-        var barSpacing: CGFloat { self == .notch ? 2.5 : 3.6 }
-        var restHeight: CGFloat { self == .notch ? 3 : 3.5 }
-        var peakHeight: CGFloat { self == .notch ? 15 : 27 }
+        var barWidth: CGFloat { self == .notch ? 3 : 4 }
+        var barSpacing: CGFloat { 3 }
+        var restHeight: CGFloat { self == .notch ? 3 : 4 }
+        var peakHeight: CGFloat { self == .notch ? 15 : 28 }
     }
 
     var isPlaying: Bool
@@ -112,11 +114,11 @@ final class RadianceLayerView: NSView {
             let bar = CAGradientLayer()
             bar.cornerRadius = placement.barWidth / 2
             bar.bounds = CGRect(x: 0, y: 0, width: placement.barWidth, height: placement.restHeight)
-            bar.position = CGPoint(x: (size.width - total) / 2 + CGFloat(index) * (placement.barWidth + placement.barSpacing)
-                                      + placement.barWidth / 2,
-                                   y: size.height / 2)
+            let left = ((size.width - total) / 2).rounded() + CGFloat(index) * (placement.barWidth + placement.barSpacing)
+            bar.position = CGPoint(x: left + placement.barWidth / 2, y: size.height / 2)
             bar.shadowOffset = .zero
-            bar.shadowRadius = placement == .notch ? 3 : 4
+            // A tight glow keeps the bars' edges readable.
+            bar.shadowRadius = placement == .notch ? 1.5 : 2
             root.addSublayer(bar)
             bars.append(bar)
         }
@@ -250,7 +252,7 @@ final class RadianceLayerView: NSView {
 
     private func beginLive() {
         for layer in [halo, ring, dot, waveLine] + bars as [CALayer] { layer.removeAllAnimations() }
-        let shadow = Float(0.9 * glow)
+        let shadow = Float(0.45 * glow)
         for bar in bars { bar.shadowOpacity = shadow }
         waveHolder.shadowOpacity = shadow
         dot.shadowOpacity = shadow
@@ -274,27 +276,42 @@ final class RadianceLayerView: NSView {
         }
         let energy = values.reduce(0, +) / Double(max(values.count, 1))
 
-        CATransaction.begin()
-        CATransaction.setAnimationDuration(1.0 / 30.0)
-        CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .linear))
         // A loud hit flashes the glow.
-        halo.opacity = Float(glow * min(0.25 + 0.5 * energy + 0.6 * Double(punch), 1.2))
+        glide(halo, "opacity", to: glow * 0.8 * min(0.2 + 0.45 * energy + 0.55 * Double(punch), 1.1))
         switch style ?? .bars {
         case .bars:
             for (index, bar) in bars.enumerated() {
                 let shaped = values[index] * (0.7 + 0.3 * envelope[index])
-                bar.bounds.size.height = placement.restHeight + (placement.peakHeight - placement.restHeight) * CGFloat(shaped)
+                // Whole points: a bar's top edge stays sharp at every height.
+                let height = (placement.restHeight + (placement.peakHeight - placement.restHeight) * CGFloat(shaped)).rounded()
+                glide(bar, "bounds.size.height", to: height)
             }
         case .wave:
             let t = CACurrentMediaTime()
-            waveLine.path = wavePath(t: t, amplitude: min(0.05 + 0.38 * energy + 0.2 * Double(punch), 0.55))
+            glide(waveLine, "path", to: wavePath(t: t, amplitude: min(0.05 + 0.38 * energy + 0.2 * Double(punch), 0.55)))
         case .pulse:
             let beat = min(min(values.first ?? 0, 1) * 0.5 + energy * 0.3 + Double(punch) * 0.5, 1.2)
-            ring.transform = CATransform3DMakeScale(1 + beat, 1 + beat, 1)
-            ring.opacity = Float(1 - beat * 0.8)
-            dot.transform = CATransform3DMakeScale(1 + beat * 0.15, 1 + beat * 0.15, 1)
+            glide(ring, "transform.scale", to: 1 + beat)
+            glide(ring, "opacity", to: 1 - beat * 0.8)
+            glide(dot, "transform.scale", to: 1 + beat * 0.15)
         }
+    }
+
+    /// Moves `keyPath` to `value`, gliding from wherever it is on screen right now.
+    /// Each new frame of levels picks up mid-flight from the last, so the motion is one
+    /// smooth curve at the display's own rate instead of steps 30 times a second.
+    private func glide(_ layer: CALayer, _ keyPath: String, to value: Any) {
+        let from = layer.presentation()?.value(forKeyPath: keyPath) ?? layer.value(forKeyPath: keyPath)
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        layer.setValue(value, forKeyPath: keyPath)
         CATransaction.commit()
+        let glide = CABasicAnimation(keyPath: keyPath)
+        glide.fromValue = from
+        glide.toValue = value
+        glide.duration = 0.14
+        glide.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        layer.add(glide, forKey: "glide." + keyPath)
     }
 
     // MARK: - Decorative motion
@@ -303,7 +320,7 @@ final class RadianceLayerView: NSView {
     /// originals nudged to whole multiples of the loop, so it repeats without a seam.
     private func startMotion(blendIn: Bool) {
         let glow = self.glow
-        let shadow = Float(0.9 * glow)
+        let shadow = Float(0.45 * glow)
         for bar in bars { bar.shadowOpacity = shadow }
         waveHolder.shadowOpacity = shadow
         dot.shadowOpacity = shadow
@@ -313,7 +330,7 @@ final class RadianceLayerView: NSView {
         let haloLoop = 2 * Double.pi / 0.75
         loop(halo, "opacity", duration: haloLoop, samples: 48, blendIn: blendIn) { t in
             let energy = 0.5 + 0.5 * sin(t * 2.25) * sin(t * 1.5 + 1)
-            return glow * (0.35 + 0.4 * energy)
+            return glow * 0.8 * (0.35 + 0.4 * energy)
         }
 
         switch style ?? .bars {
