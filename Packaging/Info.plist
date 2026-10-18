@@ -22,6 +22,8 @@
 	<true/>
 	<key>NSHighResolutionCapable</key>
 	<true/>
+	<key>NSAudioCaptureUsageDescription</key>
+	<string>With "React to the music" on, Spindle listens to the sound your Mac plays so its waves move with the song. It only measures how loud the music is; nothing is recorded or saved.</string>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>Spindle needs to control Music and Spotify to show the track that is playing and to let you scrub with the tonearm.</string>
 	<key>NSSupportsAutomaticTermination</key>

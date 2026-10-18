@@ -1,5 +1,5 @@
 {
-  "version": "0.6.2",
-  "notes": "Shape the panel your way: width, height, corners, cover size, motion and closing speed, with presets (Compact, Standard, Wide, Cinema, Tall) and a live preview. Swiping between the player and the timer now feels like macOS.",
+  "version": "0.6.3",
+  "notes": "Waves beside the controls in the open panel, like Vinylpod. New option: React to the music — the waves move with the song's actual sound (macOS asks first; nothing is recorded).",
   "minimumSystemVersion": "14.0"
 }

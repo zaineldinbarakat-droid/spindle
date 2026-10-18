@@ -59,7 +59,24 @@ struct SettingsView: View {
             PanelSettings(preview: previewPanel, previewBriefly: previewBriefly)
 
             Section {
-                Toggle("Show the playing indicator", isOn: $notch.showVisualizer)
+                Toggle("Show the playing indicator in the closed notch", isOn: $notch.showVisualizer)
+                Toggle("Show the waves in the open panel, beside the controls", isOn: $notch.panelWaves)
+                Toggle("React to the music", isOn: $notch.liveWaves)
+                Text("The waves move with the song's actual sound instead of a steady rhythm. macOS asks once to let Spindle hear the audio your Mac plays — it only measures how loud the music is; nothing is recorded or saved.")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                if notch.liveWaves, let failure = AudioLevels.shared.failure {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.yellow)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(failure + " The waves use their usual rhythm instead.").font(.callout)
+                            Button("Open Privacy Settings") {
+                                NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")!)
+                            }
+                            .buttonStyle(.link)
+                        }
+                    }
+                }
                 if notch.showVisualizer {
                     HStack {
                         Spacer()
@@ -101,9 +118,9 @@ struct SettingsView: View {
                     }
                 }
             } header: {
-                Text("Playing indicator")
+                Text("Waves")
             } footer: {
-                Text("The little glow on the right of the closed notch while music plays.")
+                Text("The waves of the song playing: small on the right of the closed notch, larger beside the controls when it's open. Style, colour, brightness and glow apply to both.")
                     .font(.caption).foregroundStyle(.secondary)
             }
 

@@ -106,7 +106,8 @@ struct NotchRootView: View {
                                  color: viewModel.indicatorColor(accent: player.accent),
                                  style: viewModel.indicatorStyle,
                                  brightness: viewModel.indicatorBrightness,
-                                 glow: viewModel.indicatorGlow)
+                                 glow: viewModel.indicatorGlow,
+                                 live: viewModel.liveWaves)
                 }
             }
             .frame(maxWidth: .infinity)
@@ -165,6 +166,18 @@ struct NotchRootView: View {
                 HStack {
                     TransportControls()
                     Spacer()
+                    if viewModel.panelWaves {
+                        // The song's waves, after Vinylpod: the same look as the
+                        // notch's indicator, larger, in the room beside the controls.
+                        RadianceView(isPlaying: player.snapshot.isPlaying,
+                                     color: viewModel.indicatorColor(accent: player.accent),
+                                     style: viewModel.indicatorStyle,
+                                     brightness: viewModel.indicatorBrightness,
+                                     glow: viewModel.indicatorGlow,
+                                     layout: .panel,
+                                     live: viewModel.liveWaves)
+                            .transition(.opacity)
+                    }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)

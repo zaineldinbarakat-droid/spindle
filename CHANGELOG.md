@@ -2,6 +2,10 @@
 
 All notable changes to Spindle.
 
+## 0.6.3 — The song's waves
+- **Waves in the open panel**, beside the controls, like Vinylpod — the same look as the closed notch's indicator, larger.
+- **React to the music:** the waves can move with the song's actual sound — a private system-audio tap, a quick FFT and 16 bands from bass to treble. Off by default; macOS asks first, and nothing is recorded.
+
 ## 0.6.2 — Make it yours
 - **Shape the panel:** Width and Height give it more room without stretching the cover or controls; plus Corners, Cover size, Motion (Snappy, Smooth, Bouncy) and how quickly it closes — all previewed live in the notch.
 - **Presets:** Compact, Standard, Wide, Cinema and Tall, one click each.

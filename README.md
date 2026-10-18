@@ -41,6 +41,7 @@ Spindle ist ein nativer Musikplayer für macOS, der in der Notch deines MacBooks
 - **Plattenspieler in der Notch:** Fährst du mit der Maus über die Notch, klappt ein Panel heraus – mit drehender Schallplatte (das Albumcover auf dem Label) oder dem Albumcover, Titel und Steuerung.
 - **Tonarm zum Spulen:** Zieh den Tonarm an jede beliebige Stelle im Song.
 - **Drei Looks:** *Schwarz* (nahtlos mit der Notch), *Songfarbe* und **Liquid Glass** – von klar bis milchig.
+- **Die Wellen des Songs:** Wie bei Vinylpod leuchten Wellen rechts in der geschlossenen Notch und größer neben der Steuerung im geöffneten Panel – als Balken, Welle oder Puls, in der Farbe des Albums. Mit **„Auf die Musik reagieren“** bewegen sie sich mit dem echten Klang des Songs.
 - **Fokus-Timer „Lock In“:** Pomodoro mit 25/5 oder 50/10 Minuten, direkt in der Notch und im Vollbild-Plattenspieler.
 - **Wischen zwischen Player und Timer:** Mit zwei Fingern über das Panel wischen – wie beim Durchblättern von Fotos, so flüssig wie in macOS. Oder einfach auf den Umschalter oben klicken.
 - **Ganz nach deinem Geschmack:** Voreinstellungen (*Kompakt, Standard, Breit, Kino, Hoch*) oder alles selbst einstellen – Größe, Breite, Höhe, Ecken, Cover-Größe, Animation (*Schnell, Weich, Federnd*) und wie schnell sich das Panel schließt. Alles mit Live-Vorschau in der Notch.
@@ -65,7 +66,8 @@ Spindle ist ein nativer Musikplayer für macOS, der in der Notch deines MacBooks
 - **Drag the tonearm to scrub.** The arm's angle maps exactly to the playhead and back, so you can drop the needle anywhere in the song. A progress bar and play / pause / skip sit beside it.
 - **One click to the source.** Click the cover, the record or the title and Spotify or Music comes to the front.
 - **Swipe between player and timer.** A two-finger swipe across the panel slides between the music and the focus timer, like flipping through photos — the pages follow your fingers and settle the way macOS pages do. Or click the switch at the top: the whole capsule is the button.
-- **Closed, it's a quiet pill.** The cover on the left of the notch, a *now playing* indicator on the right — bars, a wave or a pulse, in the album's colour, white or any colour, with adjustable brightness and glow.
+- **The song's waves.** Like Vinylpod: glowing waves on the right of the closed notch, and larger ones beside the controls when it's open — bars, a wave or a pulse, in the album's colour, white or any colour, with adjustable brightness and glow. Turn on **React to the music** and they move with the song's actual sound.
+- **Closed, it's a quiet pill.** The cover on the left of the notch, the waves on the right.
 
   <img src="docs/images/spindle-collapsed.png" alt="The closed notch: a small album cover on the left and glowing bars on the right">
 
@@ -89,7 +91,7 @@ Spindle ist ein nativer Musikplayer für macOS, der in der Notch deines MacBooks
 - **Focus timer — "Lock In".** Pomodoro cycles with a one-tap 25 / 5 ↔ 50 / 10 switch, long breaks, a countdown in the closed notch, notifications, and optional pause-the-music-on-breaks.
 - **Desktop widgets and a full-screen turntable.** Live *Record* and *Turntable* widgets, an optional animated wallpaper, and a full-screen scene (above) with the timer beside the song.
 - **Featherweight.** Idle, about **0.1 % CPU and 30 MB**; animations run on Core Animation, so playing music costs Spindle next to nothing.
-- **Private by design.** No account, no API key, no tracking.
+- **Private by design.** No account, no API key, no tracking. *React to the music* is off unless you turn it on — macOS then asks first, and Spindle only measures how loud the music is.
 
 ## Made to be compatible with Sleeve
 
@@ -121,6 +123,8 @@ Each app works fully on its own; together they feel like one. → [**Get Sleeve*
 **The notch.** Its exact size and position come from the screen's safe-area insets and auxiliary top areas. The panel is a borderless, non-activating window above the menu bar that never resizes — it's always the expanded size and click-through where nothing is drawn — so opening it is a pure spring animation with no window tearing.
 
 **Swiping like macOS.** The tabs sit side by side and follow a two-finger swipe one to one, read from the trackpad's raw scroll phases. Past either end they resist with the same rubber-band curve macOS uses at a scroll view's edge, and on release the finger speed over the last 80 ms decides: a third of the way, or any flick toward the next page, turns it, with a bounce-free spring.
+
+**Waves that hear the music.** With *React to the music* on, a private Core Audio process tap (macOS 14.2+) listens to what the Mac plays — the system's own permissioned way to do it. Each 1024-sample window gets a Hann-windowed FFT (Accelerate/vDSP), summed into 16 log-spaced bands from bass to treble and mapped from decibels to bar heights, smoothed to rise fast and fall gently like a VU meter. Nothing is recorded: each buffer is reduced to 16 numbers and dropped, and the tap only runs while the waves are on screen and music is playing. If macOS hands over pure digital silence (permission declined), Spindle notices and falls back to its decorative motion.
 
 **The tonearm.** Pivot geometry with an exact inverse between the arm's angle and the song's progress (unit-tested to a round-trip error of 1e-15), so dragging the arm seeks precisely.
 
@@ -163,7 +167,7 @@ Sources/
 
 - **Not notarized yet** — see [Install](#install) for the one-time step.
 - **Spotify and Apple Music only.** YouTube, Tidal and others expose no scripting interface.
-- The *now playing* indicator is decorative motion, not a real spectrum analyser (that would need a system audio tap).
+- The waves are decorative unless *React to the music* is on (that needs macOS 14.2 and your permission to hear system audio).
 
 See the [changelog](CHANGELOG.md) for the full history.
 

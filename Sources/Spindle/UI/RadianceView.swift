@@ -1,21 +1,35 @@
 import AppKit
 import SwiftUI
 
-/// The "now playing" mark in the collapsed notch, after Vinylpod: a glow in the song's
-/// colour (or white, or a colour of your choosing) that moves while music plays and
-/// settles when it's paused. Three looks:
+/// The "now playing" waves, after Vinylpod: a glow in the song's colour (or white, or a
+/// colour of your choosing) that moves while music plays and settles when it's paused.
+/// Small in the closed notch; larger beside the controls in the open panel. Three looks:
 ///
-/// - Bars: a few rounded bars, tallest in the middle, like a tiny waveform.
+/// - Bars: rounded bars, tallest in the middle, like a waveform.
 /// - Wave: one smooth line rippling across.
-/// - Pulse: a single dot that breathes.
+/// - Pulse: a dot that breathes.
 ///
-/// Decorative: the motion comes from layered sine waves rather than the audio itself,
-/// which would need a system audio tap.
-///
-/// Drawn with Core Animation, not redrawn by SwiftUI: each motion is a looping keyframe
-/// animation handed to the window server once, so while music plays Spindle itself does
-/// no work per frame. (Re-rendering it every frame cost a third of a CPU core.)
+/// Two kinds of motion:
+/// - Decorative (default): layered sine waves, as Core Animation loops handed to the
+///   window server once — Spindle does no work per frame. (Re-rendering it in SwiftUI
+///   every frame cost a third of a CPU core.)
+/// - Live ("React to the music"): the song's real sound, from `AudioLevels`, about 30
+///   times a second.
 struct RadianceView: View {
+    enum Layout {
+        /// In the closed notch's right wing.
+        case notch
+        /// Beside the controls in the open panel.
+        case panel
+
+        var size: CGSize { self == .notch ? CGSize(width: 36, height: 18) : CGSize(width: 96, height: 30) }
+        var barCount: Int { self == .notch ? 5 : 11 }
+        var barWidth: CGFloat { self == .notch ? 3 : 3.5 }
+        var barSpacing: CGFloat { self == .notch ? 2.5 : 3.6 }
+        var restHeight: CGFloat { self == .notch ? 3 : 3.5 }
+        var peakHeight: CGFloat { self == .notch ? 15 : 27 }
+    }
+
     var isPlaying: Bool
     var color: Color
     var style: NotchViewModel.IndicatorStyle = .bars
@@ -23,11 +37,14 @@ struct RadianceView: View {
     var brightness: Double = 0.85
     /// 0 (none) … 1 (strong halo).
     var glow: Double = 0.6
+    var layout: Layout = .notch
+    /// Move with the song's real sound rather than the decorative rhythm.
+    var live = false
 
     var body: some View {
         RadianceLayers(isPlaying: isPlaying, color: NSColor(color), style: style,
-                       brightness: brightness, glow: glow)
-            .frame(width: 36, height: 18)
+                       brightness: brightness, glow: glow, layout: layout, live: live)
+            .frame(width: layout.size.width, height: layout.size.height)
     }
 }
 
@@ -37,15 +54,19 @@ private struct RadianceLayers: NSViewRepresentable {
     var style: NotchViewModel.IndicatorStyle
     var brightness: Double
     var glow: Double
+    var layout: RadianceView.Layout
+    var live: Bool
 
-    func makeNSView(context: Context) -> RadianceLayerView { RadianceLayerView() }
+    func makeNSView(context: Context) -> RadianceLayerView { RadianceLayerView(layout: layout) }
 
     func updateNSView(_ view: RadianceLayerView, context: Context) {
-        view.update(isPlaying: isPlaying, color: color, style: style, brightness: brightness, glow: glow)
+        view.update(isPlaying: isPlaying, color: color, style: style, brightness: brightness,
+                    glow: glow, live: live)
     }
 }
 
 final class RadianceLayerView: NSView {
+    private let placement: RadianceView.Layout
     private let root = CALayer()
     private let halo = CAGradientLayer()
     private var bars: [CAGradientLayer] = []
@@ -58,20 +79,27 @@ final class RadianceLayerView: NSView {
     private var isPlaying = false
     private var style: NotchViewModel.IndicatorStyle?
     private var glow = 0.6
+    private var wantsLive = false
+    private var subscription: UUID?
 
-    private let size = CGSize(width: 36, height: 18)
-    private let barCount = 5
-    private let envelope: [Double] = [0.55, 0.82, 1.0, 0.82, 0.55]
+    private var size: CGSize { placement.size }
+    private var waveSize: CGSize { CGSize(width: size.width - 4, height: size.height - 2) }
 
-    init() {
-        super.init(frame: CGRect(origin: .zero, size: CGSize(width: 36, height: 18)))
+    /// Tallest in the middle, tapering to the ends.
+    private lazy var envelope: [Double] = (0..<placement.barCount).map { index in
+        0.5 + 0.5 * pow(sin(Double.pi * (Double(index) + 0.5) / Double(placement.barCount)), 1.5)
+    }
+
+    init(layout: RadianceView.Layout) {
+        self.placement = layout
+        super.init(frame: CGRect(origin: .zero, size: layout.size))
         // Layer-hosting: the layers are ours to place and animate.
         layer = CALayer()
         wantsLayer = true
         layer?.masksToBounds = false
         layer?.addSublayer(root)
         root.frame = CGRect(origin: .zero, size: size)
-        // Top-down like SwiftUI, so gradients run light-at-the-top as before.
+        // Top-down like SwiftUI, so gradients run light-at-the-top.
         root.isGeometryFlipped = true
 
         halo.type = .radial
@@ -79,21 +107,21 @@ final class RadianceLayerView: NSView {
         halo.endPoint = CGPoint(x: 1, y: 1)
         root.addSublayer(halo)
 
-        let barWidth: CGFloat = 3, spacing: CGFloat = 2.5
-        let total = CGFloat(barCount) * barWidth + CGFloat(barCount - 1) * spacing
-        for index in 0..<barCount {
+        let total = CGFloat(placement.barCount) * placement.barWidth + CGFloat(placement.barCount - 1) * placement.barSpacing
+        for index in 0..<placement.barCount {
             let bar = CAGradientLayer()
-            bar.cornerRadius = barWidth / 2
-            bar.bounds = CGRect(x: 0, y: 0, width: barWidth, height: 3)
-            bar.position = CGPoint(x: (size.width - total) / 2 + CGFloat(index) * (barWidth + spacing) + barWidth / 2,
+            bar.cornerRadius = placement.barWidth / 2
+            bar.bounds = CGRect(x: 0, y: 0, width: placement.barWidth, height: placement.restHeight)
+            bar.position = CGPoint(x: (size.width - total) / 2 + CGFloat(index) * (placement.barWidth + placement.barSpacing)
+                                      + placement.barWidth / 2,
                                    y: size.height / 2)
             bar.shadowOffset = .zero
-            bar.shadowRadius = 3
+            bar.shadowRadius = placement == .notch ? 3 : 4
             root.addSublayer(bar)
             bars.append(bar)
         }
 
-        waveHolder.frame = CGRect(x: 2, y: 1, width: 32, height: 16)
+        waveHolder.frame = CGRect(x: 2, y: 1, width: waveSize.width, height: waveSize.height)
         waveHolder.shadowOffset = .zero
         waveHolder.shadowRadius = 3
         waveFill.frame = waveHolder.bounds
@@ -102,22 +130,24 @@ final class RadianceLayerView: NSView {
         waveLine.frame = waveHolder.bounds
         waveLine.fillColor = nil
         waveLine.strokeColor = NSColor.white.cgColor
-        waveLine.lineWidth = 2.2
+        waveLine.lineWidth = placement == .notch ? 2.2 : 2.6
         waveLine.lineCap = .round
         waveLine.lineJoin = .round
         waveFill.mask = waveLine
         waveHolder.addSublayer(waveFill)
         root.addSublayer(waveHolder)
 
-        ring.bounds = CGRect(x: 0, y: 0, width: 8, height: 8)
+        let ringSize: CGFloat = placement == .notch ? 8 : 13
+        ring.bounds = CGRect(x: 0, y: 0, width: ringSize, height: ringSize)
         ring.position = CGPoint(x: size.width / 2, y: size.height / 2)
         ring.path = CGPath(ellipseIn: ring.bounds.insetBy(dx: 0.75, dy: 0.75), transform: nil)
         ring.fillColor = nil
         ring.lineWidth = 1.5
         root.addSublayer(ring)
 
-        dot.bounds = CGRect(x: 0, y: 0, width: 7, height: 7)
-        dot.cornerRadius = 3.5
+        let dotSize: CGFloat = placement == .notch ? 7 : 11
+        dot.bounds = CGRect(x: 0, y: 0, width: dotSize, height: dotSize)
+        dot.cornerRadius = dotSize / 2
         dot.position = ring.position
         dot.shadowOffset = .zero
         dot.shadowRadius = 4
@@ -134,6 +164,11 @@ final class RadianceLayerView: NSView {
         for layer in [root, halo, waveHolder, waveFill, waveLine, ring, dot] + bars { layer.contentsScale = scale }
     }
 
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        updateSubscription()
+    }
+
     override func layout() {
         super.layout()
         CATransaction.begin()
@@ -145,14 +180,16 @@ final class RadianceLayerView: NSView {
     }
 
     func update(isPlaying: Bool, color: NSColor, style: NotchViewModel.IndicatorStyle,
-                brightness: Double, glow: Double) {
+                brightness: Double, glow: Double, live: Bool) {
         let color = color.usingColorSpace(.sRGB) ?? color
         let light = color.blended(withFraction: 0.25 + 0.35 * brightness, of: .white) ?? color
         root.opacity = Float(0.35 + 0.65 * brightness)
 
         halo.colors = [color.cgColor, color.withAlphaComponent(0).cgColor]
-        let haloWidth: CGFloat = style == .pulse ? 38 : 50
-        halo.frame = CGRect(x: (size.width - haloWidth) / 2, y: (size.height - 30) / 2, width: haloWidth, height: 30)
+        let haloWidth = size.width * (style == .pulse ? 1.05 : 1.4)
+        let haloHeight = size.height * 1.7
+        halo.frame = CGRect(x: (size.width - haloWidth) / 2, y: (size.height - haloHeight) / 2,
+                            width: haloWidth, height: haloHeight)
         for bar in bars {
             bar.colors = [light.cgColor, color.cgColor]
             bar.shadowColor = color.cgColor
@@ -164,9 +201,11 @@ final class RadianceLayerView: NSView {
         dot.shadowColor = color.cgColor
 
         let styleChanged = style != self.style
-        let changed = styleChanged || isPlaying != self.isPlaying || glow != self.glow
+        let liveChanged = live != wantsLive
+        let changed = styleChanged || liveChanged || isPlaying != self.isPlaying || glow != self.glow
         self.style = style
         self.glow = glow
+        wantsLive = live
         guard changed else { return }
         let wasPlaying = self.isPlaying
         self.isPlaying = isPlaying
@@ -176,15 +215,88 @@ final class RadianceLayerView: NSView {
         ring.isHidden = style != .pulse
         dot.isHidden = style != .pulse
 
+        updateSubscription()
         let moving = isPlaying && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
-        if moving {
-            startMotion(blendIn: !wasPlaying || styleChanged)
+        if moving && isLive {
+            beginLive()
+        } else if moving {
+            startMotion(blendIn: !wasPlaying || styleChanged || liveChanged)
         } else {
             settle()
         }
     }
 
-    // MARK: - Motion
+    // MARK: - Live
+
+    /// Live only when asked for, playing, on screen, and macOS hasn't refused.
+    private var isLive: Bool {
+        wantsLive && isPlaying && window != nil && AudioLevels.shared.failure == nil
+    }
+
+    private func updateSubscription() {
+        if isLive, subscription == nil {
+            subscription = AudioLevels.shared.subscribe { [weak self] levels in self?.show(levels) }
+            // The tap may have just failed to start (no permission): use the loops then.
+            if AudioLevels.shared.failure != nil {
+                AudioLevels.shared.unsubscribe(subscription)
+                subscription = nil
+                if isPlaying { startMotion(blendIn: true) }
+            }
+        } else if !isLive, let id = subscription {
+            AudioLevels.shared.unsubscribe(id)
+            subscription = nil
+        }
+    }
+
+    private func beginLive() {
+        for layer in [halo, ring, dot, waveLine] + bars as [CALayer] { layer.removeAllAnimations() }
+        let shadow = Float(0.9 * glow)
+        for bar in bars { bar.shadowOpacity = shadow }
+        waveHolder.shadowOpacity = shadow
+        dot.shadowOpacity = shadow
+    }
+
+    /// One frame of real levels: each bar takes the bands under it.
+    private func show(_ bands: [Float]) {
+        // macOS stopped sharing the sound: back to the usual rhythm.
+        if AudioLevels.shared.failure != nil {
+            updateSubscription()
+            if isPlaying { startMotion(blendIn: true) }
+            return
+        }
+        guard isLive else { return }
+        let count = placement.barCount
+        let values: [Double] = (0..<count).map { index in
+            // Bass on the left, treble on the right, like a spectrum.
+            let start = index * bands.count / count, end = max((index + 1) * bands.count / count, start + 1)
+            let slice = bands[start..<min(end, bands.count)]
+            return Double(slice.reduce(0, +)) / Double(slice.count)
+        }
+        let energy = values.reduce(0, +) / Double(max(values.count, 1))
+
+        CATransaction.begin()
+        CATransaction.setAnimationDuration(1.0 / 30.0)
+        CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .linear))
+        halo.opacity = Float(glow * (0.3 + 0.6 * energy))
+        switch style ?? .bars {
+        case .bars:
+            for (index, bar) in bars.enumerated() {
+                let shaped = values[index] * (0.65 + 0.35 * envelope[index])
+                bar.bounds.size.height = placement.restHeight + (placement.peakHeight - placement.restHeight) * CGFloat(shaped)
+            }
+        case .wave:
+            let t = CACurrentMediaTime()
+            waveLine.path = wavePath(t: t, amplitude: 0.05 + 0.4 * energy)
+        case .pulse:
+            let beat = min(values.first ?? 0, 1) * 0.6 + energy * 0.4
+            ring.transform = CATransform3DMakeScale(1 + beat, 1 + beat, 1)
+            ring.opacity = Float(1 - beat * 0.8)
+            dot.transform = CATransform3DMakeScale(1 + beat * 0.15, 1 + beat * 0.15, 1)
+        }
+        CATransaction.commit()
+    }
+
+    // MARK: - Decorative motion
 
     /// One loop of each motion, sampled into keyframes. The frequencies are the
     /// originals nudged to whole multiples of the loop, so it repeats without a seam.
@@ -194,6 +306,7 @@ final class RadianceLayerView: NSView {
         for bar in bars { bar.shadowOpacity = shadow }
         waveHolder.shadowOpacity = shadow
         dot.shadowOpacity = shadow
+        dot.transform = CATransform3DIdentity
 
         // Halo: breathes with the music. Loop 8.4 s (ω 2.25 and 1.5).
         let haloLoop = 2 * Double.pi / 0.75
@@ -206,12 +319,13 @@ final class RadianceLayerView: NSView {
         case .bars:
             // Loop 4.65 s (ω 2.7, 5.4, 8.1 for the original 2.7, 5.1, 8.3).
             let barLoop = 2 * Double.pi * 20 / 27
+            let rest = Double(placement.restHeight), span = Double(placement.peakHeight - placement.restHeight)
             for (index, bar) in bars.enumerated() {
                 let phase = Double(index) * 1.3
                 let envelope = self.envelope[index]
                 loop(bar, "bounds.size.height", duration: barLoop, samples: 64, blendIn: blendIn) { t in
                     let wave = sin(t * 8.1 + phase * 1.9) * 0.35 + sin(t * 5.4 + phase) * 0.45 + sin(t * 2.7 + phase * 0.6) * 0.2
-                    return 3 + 12 * envelope * (0.35 + 0.65 * (wave + 1) / 2)
+                    return rest + span * envelope * (0.35 + 0.65 * (wave + 1) / 2)
                 }
             }
         case .wave:
@@ -234,10 +348,10 @@ final class RadianceLayerView: NSView {
         }
     }
 
-    /// Back to rest from wherever the motion is, the way the SwiftUI version eased out.
+    /// Back to rest from wherever the motion is.
     private func settle() {
         let layers: [(CALayer, String, Double)] = [(halo, "opacity", 0), (ring, "transform.scale", 1), (ring, "opacity", 1)]
-            + bars.map { ($0, "bounds.size.height", 3) }
+            + bars.map { ($0, "bounds.size.height", Double(placement.restHeight)) }
         for (layer, keyPath, rest) in layers {
             let from = layer.presentation()?.value(forKeyPath: keyPath) ?? rest
             layer.removeAllAnimations()
@@ -254,11 +368,12 @@ final class RadianceLayerView: NSView {
         }
         waveLine.removeAllAnimations()
         waveLine.path = wavePath(t: 0, amplitude: 0.5 / 16)
+        dot.transform = CATransform3DIdentity
         for layer in bars + [waveHolder, dot] as [CALayer] { layer.shadowOpacity = 0 }
     }
 
-    /// A seamless looping keyframe animation of `keyPath`, optionally eased in from the
-    /// current value first so starting never jumps.
+    /// A seamless looping keyframe animation of `keyPath`, eased in from the current
+    /// value first so starting never jumps.
     private func loop(_ layer: CALayer, _ keyPath: String, duration: Double, samples: Int,
                       blendIn: Bool, value: (Double) -> Double) {
         let values = (0...samples).map { value(duration * Double($0) / Double(samples)) }
@@ -285,19 +400,28 @@ final class RadianceLayerView: NSView {
         layer.add(animation, forKey: "loop")
     }
 
-    /// The rippling line, tapered at both ends so it fades into the notch.
+    /// The rippling line, tapered at both ends so it fades out.
     private func wavePath(t: Double, amplitude: Double) -> CGPath {
         let path = CGMutablePath()
-        let width: CGFloat = 32, height: CGFloat = 16
+        let width = waveSize.width, height = waveSize.height
         let mid = height / 2
-        for step in 0...36 {
-            let u = Double(step) / 36
+        let steps = placement == .notch ? 36 : 60
+        let cycles = placement == .notch ? 1.0 : 1.8
+        for step in 0...steps {
+            let u = Double(step) / Double(steps)
             let taper = sin(u * .pi)
-            let y = mid + CGFloat((sin(u * 9 - t * 6) * 0.65 + sin(u * 5 + t * 3) * 0.35) * amplitude * Double(height) * taper)
+            let y = mid + CGFloat((sin(u * 9 * cycles - t * 6) * 0.65 + sin(u * 5 * cycles + t * 3) * 0.35)
+                                  * amplitude * Double(height) * taper)
             let point = CGPoint(x: width * CGFloat(u), y: y)
             step == 0 ? path.move(to: point) : path.addLine(to: point)
         }
         return path
+    }
+
+    deinit {
+        if let subscription {
+            Task { @MainActor in AudioLevels.shared.unsubscribe(subscription) }
+        }
     }
 }
 

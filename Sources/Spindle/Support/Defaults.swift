@@ -23,6 +23,8 @@ enum Defaults {
         case coverScale
         case notchMotion
         case closeDelay
+        case panelWaves
+        case liveWaves
         case coverGlow
 
         // Focus timer

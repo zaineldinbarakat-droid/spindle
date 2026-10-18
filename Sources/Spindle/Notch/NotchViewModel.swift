@@ -227,6 +227,17 @@ final class NotchViewModel: ObservableObject {
     @Published var showVisualizer: Bool = Defaults.bool(.showVisualizer, default: true) {
         didSet { Defaults.set(.showVisualizer, showVisualizer) }
     }
+    /// The waves, larger, beside the controls in the open panel.
+    @Published var panelWaves: Bool = Defaults.bool(.panelWaves, default: true) {
+        didSet { Defaults.set(.panelWaves, panelWaves) }
+    }
+    /// Waves that move with the song's actual sound (system audio, with permission).
+    @Published var liveWaves: Bool = Defaults.bool(.liveWaves, default: false) {
+        didSet {
+            Defaults.set(.liveWaves, liveWaves)
+            if liveWaves { AudioLevels.shared.retry() }
+        }
+    }
 
     var isExpanded: Bool { state == .expanded }
 
