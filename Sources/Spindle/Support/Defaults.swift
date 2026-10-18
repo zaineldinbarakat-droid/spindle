@@ -17,6 +17,12 @@ enum Defaults {
         case glassClarity
         case glassTinted
         case panelScale
+        case panelWidth
+        case panelHeight
+        case panelCornerRadius
+        case coverScale
+        case notchMotion
+        case closeDelay
         case coverGlow
 
         // Focus timer

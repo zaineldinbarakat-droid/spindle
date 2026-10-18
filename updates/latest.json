@@ -1,5 +1,5 @@
 {
-  "version": "0.6.1",
-  "notes": "Swipe with two fingers between the player and the timer, like flipping through photos. The player/timer switch is one big button. Choose how big the panel opens in Settings → Notch → Size (default 10% smaller), with a live preview.",
+  "version": "0.6.2",
+  "notes": "Shape the panel your way: width, height, corners, cover size, motion and closing speed, with presets (Compact, Standard, Wide, Cinema, Tall) and a live preview. Swiping between the player and the timer now feels like macOS.",
   "minimumSystemVersion": "14.0"
 }

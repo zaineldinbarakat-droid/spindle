@@ -2,6 +2,12 @@
 
 All notable changes to Spindle.
 
+## 0.6.2 — Make it yours
+- **Shape the panel:** Width and Height give it more room without stretching the cover or controls; plus Corners, Cover size, Motion (Snappy, Smooth, Bouncy) and how quickly it closes — all previewed live in the notch.
+- **Presets:** Compact, Standard, Wide, Cinema and Tall, one click each.
+- **Swiping feels like macOS:** the pages follow your fingers one to one, resist past the ends with the system's rubber-band curve, and turn on a third of the way or any flick, settling without a bounce.
+- The page dots are gone.
+
 ## 0.6.1 — Swipe and size
 - **Swipe between the player and the timer** with two fingers, like flipping through photos: the pages follow your fingers, rubber-band at the ends and settle with a spring. Two small dots show where you are.
 - The player / timer switch is one big button now — click anywhere on it.

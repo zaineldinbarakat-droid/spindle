@@ -13,16 +13,28 @@ struct NotchMetrics: Equatable {
     /// How big the open panel is drawn, relative to its 500 × 200 pt design. The closed
     /// pill always matches the hardware notch and doesn't scale.
     var panelScale: CGFloat = 1
+    /// Extra width and height for the panel's pages. These give the content room — the
+    /// cover and controls keep their size — rather than stretching it.
+    var panelWidthFactor: CGFloat = 1
+    var panelHeightFactor: CGFloat = 1
 
-    /// The largest size the setting allows; the window is always big enough for it, so
-    /// changing the size never resizes the window.
+    /// The largest values the settings allow; the window is always big enough for them,
+    /// so changing the panel never resizes the window.
     static let maxPanelScale: CGFloat = 1.15
+    static let maxPanelWidthFactor: CGFloat = 1.4
+    static let maxPanelHeightFactor: CGFloat = 1.3
+
+    /// The tabs' layout size before scaling.
+    var pageSize: CGSize {
+        CGSize(width: Theme.expandedWidth * panelWidthFactor,
+               height: (Theme.expandedHeight - notchHeight) * panelHeightFactor)
+    }
 
     /// The open panel's size. The strip beside the camera keeps the notch's real height;
     /// everything below it scales.
     var panelSize: CGSize {
-        CGSize(width: Theme.expandedWidth * panelScale,
-               height: notchHeight + (Theme.expandedHeight - notchHeight) * panelScale)
+        CGSize(width: pageSize.width * panelScale,
+               height: notchHeight + pageSize.height * panelScale)
     }
 
     /// Fallback size for external displays and pre-2021 Macs, where we draw a pill that
@@ -59,8 +71,9 @@ struct NotchMetrics: Equatable {
 
     /// Window frame large enough to hold the expanded panel, anchored to the screen top.
     func windowFrame() -> CGRect {
-        let width = max(Theme.expandedWidth * Self.maxPanelScale, notchWidth + Theme.collapsedWingWidth * 2) + 80
-        let height = notchHeight + (Theme.expandedHeight - notchHeight) * Self.maxPanelScale + 60
+        let width = max(Theme.expandedWidth * Self.maxPanelWidthFactor * Self.maxPanelScale,
+                        notchWidth + Theme.collapsedWingWidth * 2) + 80
+        let height = notchHeight + (Theme.expandedHeight - notchHeight) * Self.maxPanelHeightFactor * Self.maxPanelScale + 60
         return CGRect(x: notchCenterX - width / 2,
                       y: screenFrame.maxY - height,
                       width: width,

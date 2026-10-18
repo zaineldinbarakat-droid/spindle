@@ -46,7 +46,9 @@ final class NotchViewModel: ObservableObject {
     var statePublisher: AnyPublisher<State, Never> { $state.eraseToAnyPublisher() }
     @Published private(set) var metrics: NotchMetrics = {
         var metrics = NotchMetrics.current()
-        metrics.panelScale = CGFloat(Defaults.double(.panelScale, default: NotchViewModel.defaultPanelScale))
+        metrics.panelScale = CGFloat(Defaults.double(.panelScale, default: PanelPreset.standard.scale))
+        metrics.panelWidthFactor = CGFloat(Defaults.double(.panelWidth, default: PanelPreset.standard.width))
+        metrics.panelHeightFactor = CGFloat(Defaults.double(.panelHeight, default: PanelPreset.standard.height))
         return metrics
     }()
     var metricsPublisher: AnyPublisher<NotchMetrics, Never> { $metrics.eraseToAnyPublisher() }
@@ -54,23 +56,73 @@ final class NotchViewModel: ObservableObject {
     @Published var isInteracting = false
     @Published var tab: Tab = .player
 
-    /// The open panel's size, relative to its original design. A little smaller than
-    /// that by default; Settings → Notch → Size goes from 75 % to 115 %.
-    @Published var panelScale: Double = Defaults.double(.panelScale, default: NotchViewModel.defaultPanelScale) {
-        didSet {
-            Defaults.set(.panelScale, panelScale)
-            metrics.panelScale = CGFloat(panelScale)
-        }
+    // MARK: Panel size and feel (Settings → Panel)
+
+    /// Overall size, relative to the original design: everything scales together.
+    @Published var panelScale: Double = Defaults.double(.panelScale, default: PanelPreset.standard.scale) {
+        didSet { Defaults.set(.panelScale, panelScale); syncPanelMetrics() }
     }
-    static let defaultPanelScale = 0.9
+    /// Extra width: more room between the cover and the controls, a longer progress bar.
+    @Published var panelWidth: Double = Defaults.double(.panelWidth, default: PanelPreset.standard.width) {
+        didSet { Defaults.set(.panelWidth, panelWidth); syncPanelMetrics() }
+    }
+    /// Extra height: more room above and below the content.
+    @Published var panelHeight: Double = Defaults.double(.panelHeight, default: PanelPreset.standard.height) {
+        didSet { Defaults.set(.panelHeight, panelHeight); syncPanelMetrics() }
+    }
+    /// The panel's lower corners, in points at 100 % size.
+    @Published var panelCornerRadius: Double = Defaults.double(.panelCornerRadius, default: PanelPreset.standard.cornerRadius) {
+        didSet { Defaults.set(.panelCornerRadius, panelCornerRadius) }
+    }
+    /// The album cover or record, relative to its usual size.
+    @Published var coverScale: Double = Defaults.double(.coverScale, default: PanelPreset.standard.cover) {
+        didSet { Defaults.set(.coverScale, coverScale) }
+    }
+    /// How the panel springs open and tucks away.
+    @Published var motion: NotchMotion = NotchMotion.current {
+        didSet { Defaults.set(.notchMotion, motion.rawValue) }
+    }
+    /// How long the panel waits after the cursor leaves before closing.
+    @Published var closeDelay: Double = Defaults.double(.closeDelay, default: 0.08) {
+        didSet { Defaults.set(.closeDelay, closeDelay) }
+    }
+
     static let panelScaleRange: ClosedRange<Double> = 0.75...Double(NotchMetrics.maxPanelScale)
-    /// Kept open while Settings' size slider is dragged, as a live preview.
+    static let panelWidthRange: ClosedRange<Double> = 0.85...Double(NotchMetrics.maxPanelWidthFactor)
+    static let panelHeightRange: ClosedRange<Double> = 0.9...Double(NotchMetrics.maxPanelHeightFactor)
+    static let cornerRadiusRange: ClosedRange<Double> = 8...40
+    static let coverScaleRange: ClosedRange<Double> = 0.8...1.1
+    static let closeDelayRange: ClosedRange<Double> = 0...0.8
+
+    /// The preset matching the current settings, if any.
+    var currentPreset: PanelPreset? {
+        PanelPreset.all.first { $0.matches(self) }
+    }
+
+    func apply(_ preset: PanelPreset) {
+        panelScale = preset.scale
+        panelWidth = preset.width
+        panelHeight = preset.height
+        panelCornerRadius = preset.cornerRadius
+        coverScale = preset.cover
+    }
+
+    private func syncPanelMetrics() {
+        var new = metrics
+        new.panelScale = CGFloat(panelScale)
+        new.panelWidthFactor = CGFloat(panelWidth)
+        new.panelHeightFactor = CGFloat(panelHeight)
+        if new != metrics { metrics = new }
+    }
+
+    /// Kept open while a panel setting is being adjusted, as a live preview.
     @Published var isPreviewingSize = false
 
     /// How far a two-finger swipe has dragged the tabs, in points (0 at rest).
     @Published var swipeOffset: CGFloat = 0
-    /// The spring tabs settle with, after a swipe or a tap on the switcher.
-    static let pageSpring = Animation.spring(response: 0.38, dampingFraction: 0.86)
+    /// The spring tabs settle with, after a swipe or a tap on the switcher: quick and
+    /// without overshoot, the way macOS settles a page swipe.
+    static let pageSpring = Animation.spring(duration: 0.32, bounce: 0)
     /// Set while Sleeve's Zen mode is on: the whole notch UI steps out of the way.
     @Published var isZenHidden = false
     @Published var style: Style = Style(rawValue: Defaults.string(.notchStyle) ?? "") ?? .songColor {
@@ -198,7 +250,36 @@ final class NotchViewModel: ObservableObject {
     func updateMetrics(_ new: NotchMetrics) {
         var new = new
         new.panelScale = CGFloat(panelScale)
+        new.panelWidthFactor = CGFloat(panelWidth)
+        new.panelHeightFactor = CGFloat(panelHeight)
         guard new != metrics else { return }
         metrics = new
+    }
+}
+
+/// A ready-made shape for the open panel (Settings → Panel).
+struct PanelPreset: Identifiable, Equatable {
+    var name: String
+    var scale: Double
+    var width: Double
+    var height: Double
+    var cornerRadius: Double
+    var cover: Double
+    var id: String { name }
+
+    static let compact = PanelPreset(name: "Compact", scale: 0.82, width: 0.92, height: 0.95, cornerRadius: 18, cover: 0.95)
+    static let standard = PanelPreset(name: "Standard", scale: 0.9, width: 1.0, height: 1.0, cornerRadius: 22, cover: 1.0)
+    static let wide = PanelPreset(name: "Wide", scale: 0.9, width: 1.25, height: 1.0, cornerRadius: 24, cover: 1.0)
+    static let cinema = PanelPreset(name: "Cinema", scale: 0.95, width: 1.4, height: 0.92, cornerRadius: 30, cover: 1.0)
+    static let tall = PanelPreset(name: "Tall", scale: 0.9, width: 1.0, height: 1.22, cornerRadius: 28, cover: 1.08)
+    static let all = [compact, standard, wide, cinema, tall]
+
+    /// The panel's proportions, for the little silhouettes in Settings.
+    var aspect: CGFloat { CGFloat(width * 500) / CGFloat(height * 168) }
+
+    @MainActor func matches(_ model: NotchViewModel) -> Bool {
+        abs(model.panelScale - scale) < 0.005 && abs(model.panelWidth - width) < 0.005
+            && abs(model.panelHeight - height) < 0.005 && abs(model.panelCornerRadius - cornerRadius) < 0.5
+            && abs(model.coverScale - cover) < 0.005
     }
 }

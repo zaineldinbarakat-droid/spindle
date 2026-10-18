@@ -40,27 +40,6 @@ struct SettingsView: View {
                 }
                 Toggle("Glow behind the album cover", isOn: $notch.coverGlow)
                     .help("Off: around the cover is just the notch's own look, with no colour rising from behind it.")
-                LabeledContent("Size") {
-                    HStack {
-                        Text("Smaller").font(.caption).foregroundStyle(.secondary)
-                        Slider(value: $notch.panelScale, in: NotchViewModel.panelScaleRange, step: 0.01,
-                               onEditingChanged: previewSize)
-                        Text("Larger").font(.caption).foregroundStyle(.secondary)
-                        Text("\(Int((notch.panelScale * 100).rounded())) %")
-                            .monospacedDigit()
-                            .frame(width: 44, alignment: .trailing)
-                    }
-                }
-                HStack(alignment: .firstTextBaseline) {
-                    Text("How big the panel opens — the notch opens while you drag, so you can see it. The closed pill always fits your Mac's notch.")
-                        .font(.caption).foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Spacer()
-                    Button("Reset") {
-                        withAnimation { notch.panelScale = NotchViewModel.defaultPanelScale }
-                    }
-                    .disabled(abs(notch.panelScale - NotchViewModel.defaultPanelScale) < 0.005)
-                }
                 Picker("When closed, show", selection: $notch.collapsedShowsCover) {
                     Text("Album Cover").tag(true)
                     Text("Spinning Record").tag(false)
@@ -76,6 +55,8 @@ struct SettingsView: View {
             } header: {
                 Text("Notch")
             }
+
+            PanelSettings(preview: previewPanel, previewBriefly: previewBriefly)
 
             Section {
                 Toggle("Show the playing indicator", isOn: $notch.showVisualizer)
@@ -228,20 +209,45 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 480, height: 700)
+        .frame(width: 540, height: 720)
     }
 
-    /// Opens the notch while the size slider is held, and closes it a moment after
+    /// Opens the notch while a panel slider is held, and closes it a moment after
     /// letting go (unless the cursor has gone up to it).
-    private func previewSize(_ editing: Bool) {
+    private func previewPanel(_ editing: Bool) {
         sizePreview += 1
         if editing {
             notch.isPreviewingSize = true
             notch.expand()
             return
         }
+        endPreview(after: 1.2)
+    }
+
+    /// Shows the panel for a moment — after picking a preset or a motion style.
+    /// For motion it closes and reopens, so the new spring is what you see.
+    private func previewBriefly(reopen: Bool) {
+        sizePreview += 1
         let preview = sizePreview
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+        if reopen && notch.isExpanded {
+            notch.isPreviewingSize = false
+            notch.collapse()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+                guard preview == sizePreview else { return }
+                notch.isPreviewingSize = true
+                notch.expand()
+                endPreview(after: 1.4)
+            }
+            return
+        }
+        notch.isPreviewingSize = true
+        notch.expand()
+        endPreview(after: 1.6)
+    }
+
+    private func endPreview(after delay: TimeInterval) {
+        let preview = sizePreview
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
             guard preview == sizePreview else { return }
             notch.isPreviewingSize = false
             if !notch.metrics.liveZone().contains(NSEvent.mouseLocation) { notch.collapse() }
@@ -254,5 +260,117 @@ struct SettingsView: View {
         case .songColor: return "The open panel takes on the album's color; the notch itself stays black unless you allow it below."
         case .liquidGlass: return "macOS's Liquid Glass. Clear is see-through glass that bends the light at its edges; Frosted blurs what's behind it."
         }
+    }
+}
+
+/// Settings → Panel: the open panel's shape and feel, with presets and a live preview.
+private struct PanelSettings: View {
+    @EnvironmentObject private var notch: NotchViewModel
+    var preview: (Bool) -> Void
+    var previewBriefly: (Bool) -> Void
+
+    var body: some View {
+        Section {
+            HStack(spacing: 8) {
+                ForEach(PanelPreset.all) { preset in
+                    PresetTile(preset: preset, isSelected: notch.currentPreset == preset) {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) { notch.apply(preset) }
+                        previewBriefly(false)
+                    }
+                }
+            }
+            .padding(.vertical, 2)
+
+            slider("Size", value: $notch.panelScale, in: NotchViewModel.panelScaleRange,
+                   low: "Smaller", high: "Larger", readout: percent)
+            slider("Width", value: $notch.panelWidth, in: NotchViewModel.panelWidthRange,
+                   low: "Narrower", high: "Wider", readout: percent)
+            slider("Height", value: $notch.panelHeight, in: NotchViewModel.panelHeightRange,
+                   low: "Shorter", high: "Taller", readout: percent)
+            slider("Corners", value: $notch.panelCornerRadius, in: NotchViewModel.cornerRadiusRange,
+                   low: "Square", high: "Round", readout: { "\(Int($0.rounded())) pt" })
+            slider("Cover", value: $notch.coverScale, in: NotchViewModel.coverScaleRange,
+                   low: "Smaller", high: "Larger", readout: percent)
+
+            Picker("Motion", selection: $notch.motion) {
+                ForEach(NotchMotion.allCases) { Text($0.title).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .onChange(of: notch.motion) { _, _ in previewBriefly(true) }
+
+            slider("Closing", value: $notch.closeDelay, in: NotchViewModel.closeDelayRange,
+                   low: "Instantly", high: "Relaxed", readout: { String(format: "%.2f s", $0) })
+
+            HStack(alignment: .firstTextBaseline) {
+                Text("Width and Height give the panel more room — the cover and controls keep their size. Size scales everything. The notch opens while you adjust, so you can see it; the closed pill always fits your Mac's notch.")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer()
+                Button("Reset All") {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                        notch.apply(.standard)
+                        notch.motion = .smooth
+                        notch.closeDelay = 0.08
+                    }
+                    previewBriefly(false)
+                }
+                .disabled(notch.currentPreset == .standard && notch.motion == .smooth && abs(notch.closeDelay - 0.08) < 0.005)
+            }
+        } header: {
+            Text("Panel")
+        }
+    }
+
+    private func percent(_ value: Double) -> String { "\(Int((value * 100).rounded())) %" }
+
+    /// Continuous (a stepped slider draws tick marks); the readout rounds.
+    private func slider(_ title: String, value: Binding<Double>, in range: ClosedRange<Double>,
+                        low: String, high: String,
+                        readout: @escaping (Double) -> String) -> some View {
+        LabeledContent(title) {
+            HStack {
+                Text(low).font(.caption).foregroundStyle(.secondary).frame(width: 56, alignment: .trailing)
+                Slider(value: value, in: range, onEditingChanged: preview)
+                    .frame(minWidth: 150)
+                Text(high).font(.caption).foregroundStyle(.secondary).frame(width: 48, alignment: .leading)
+                Text(readout(value.wrappedValue))
+                    .monospacedDigit()
+                    .frame(width: 52, alignment: .trailing)
+            }
+            // One width for every row, so the sliders line up.
+            .frame(width: 380)
+        }
+    }
+}
+
+/// A preset as a little panel silhouette hanging from a notch, in its proportions.
+private struct PresetTile: View {
+    var preset: PanelPreset
+    var isSelected: Bool
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 6) {
+                ZStack(alignment: .top) {
+                    let height = 13 * preset.height * preset.scale / 0.9
+                    UnevenRoundedRectangle(bottomLeadingRadius: preset.cornerRadius * 0.22,
+                                           bottomTrailingRadius: preset.cornerRadius * 0.22, style: .continuous)
+                        .fill(isSelected ? Color.accentColor : Color.primary.opacity(0.55))
+                        .frame(width: height * preset.aspect, height: height)
+                    Capsule().fill(Color.black).frame(width: 12, height: 3)
+                }
+                .frame(width: 64, height: 32, alignment: .top)
+                Text(preset.name).font(.caption)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
+            .background(RoundedRectangle(cornerRadius: 8)
+                .fill(isSelected ? Color.accentColor.opacity(0.16) : Color.primary.opacity(0.04)))
+            .overlay(RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(isSelected ? Color.accentColor : .clear, lineWidth: 1.5))
+            .contentShape(RoundedRectangle(cornerRadius: 8))
+        }
+        .buttonStyle(.plain)
     }
 }

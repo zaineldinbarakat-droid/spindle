@@ -190,11 +190,13 @@ final class NotchWindowController {
     /// first real movement, so a vertical scroll is never mistaken for one.
     private var swipeIsHorizontal: Bool?
     private var swipeTravel: CGFloat = 0
-    private var lastSwipeStep: CGFloat = 0
+    /// Recent movement, to measure how fast the fingers were going on release.
+    private var swipeSamples: [(time: TimeInterval, dx: CGFloat)] = []
 
-    /// Pages like a photo strip: the tabs follow the fingers, rubber-band at the ends,
-    /// and on release settle on whichever page you swiped far (or fast) enough toward.
-    /// Returns true when the event was used.
+    /// Pages the way macOS does: the tabs follow the fingers one to one, resist past
+    /// the ends with the system's rubber-band curve, and on release go to the next page
+    /// if you'd dragged a third of the way — or flicked toward it, however short the
+    /// flick. Returns true when the event was used.
     private func handleScroll(_ event: NSEvent) -> Bool {
         guard viewModel.isExpanded, event.window === panel else { return false }
         // The glide after a swipe we handled: swallow it.
@@ -211,7 +213,7 @@ final class NotchWindowController {
         if event.phase.contains(.began) || event.phase.contains(.mayBegin) {
             swipeIsHorizontal = nil
             swipeTravel = 0
-            lastSwipeStep = 0
+            swipeSamples.removeAll()
         }
         if event.phase.contains(.ended) || event.phase.contains(.cancelled) {
             guard swipeIsHorizontal == true else { return false }
@@ -221,31 +223,40 @@ final class NotchWindowController {
 
         let dx = event.scrollingDeltaX, dy = event.scrollingDeltaY
         if swipeIsHorizontal == nil {
-            guard abs(dx) + abs(dy) >= 1.5 else { return false }
+            guard abs(dx) + abs(dy) >= 1 else { return false }
             swipeIsHorizontal = abs(dx) > abs(dy)
         }
         guard swipeIsHorizontal == true else { return false }
         swipeTravel += dx
-        lastSwipeStep = dx
+        swipeSamples.append((event.timestamp, dx))
+        swipeSamples.removeAll { event.timestamp - $0.time > 0.08 }
         viewModel.swipeOffset = rubberBanded(swipeTravel)
         return true
     }
 
-    /// Past either end the page resists, like a scroll view's edge.
+    /// Following the fingers one to one, except past either end, where the page gives
+    /// way less and less — the same curve macOS uses at a scroll view's edge.
     private func rubberBanded(_ travel: CGFloat) -> CGFloat {
         let width = viewModel.metrics.panelSize.width
         let pastEnd = (viewModel.tab == .player && travel > 0) || (viewModel.tab == .focus && travel < 0)
-        let limited = max(min(travel, width), -width)
-        guard pastEnd else { return limited }
-        return (limited < 0 ? -1 : 1) * width * 0.12 * (1 - exp(-abs(limited) / (width * 0.25)))
+        guard pastEnd else { return max(min(travel, width), -width) }
+        let x = abs(travel)
+        return (travel < 0 ? -1 : 1) * (1 - 1 / (x * 0.55 / width + 1)) * width
+    }
+
+    /// Finger speed over the last few hundredths of a second, in points per second.
+    private var swipeVelocity: CGFloat {
+        guard let first = swipeSamples.first, let last = swipeSamples.last, last.time > first.time else { return 0 }
+        return swipeSamples.reduce(0) { $0 + $1.dx } / CGFloat(last.time - first.time)
     }
 
     private func settleSwipe() {
         let width = viewModel.metrics.panelSize.width
         let offset = viewModel.swipeOffset
+        let velocity = swipeVelocity
         var target = viewModel.tab
-        if viewModel.tab == .player && (offset < -width * 0.18 || lastSwipeStep < -9) { target = .focus }
-        if viewModel.tab == .focus && (offset > width * 0.18 || lastSwipeStep > 9) { target = .player }
+        if viewModel.tab == .player && (offset < -width / 3 || (velocity < -220 && offset < 0)) { target = .focus }
+        if viewModel.tab == .focus && (offset > width / 3 || (velocity > 220 && offset > 0)) { target = .player }
         withAnimation(NotchViewModel.pageSpring) {
             viewModel.tab = target
             viewModel.swipeOffset = 0
@@ -343,8 +354,9 @@ final class NotchWindowController {
             self.viewModel.collapse()
         }
         closeWorkItem = item
-        // A short grace, just enough to forgive the cursor slipping off the edge.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08 + minimumOpen, execute: item)
+        // A short grace (Settings → Panel → Closing), enough to forgive the cursor
+        // slipping off the edge.
+        DispatchQueue.main.asyncAfter(deadline: .now() + viewModel.closeDelay + minimumOpen, execute: item)
     }
 
     // MARK: - Teardown

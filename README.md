@@ -42,8 +42,8 @@ Spindle ist ein nativer Musikplayer für macOS, der in der Notch deines MacBooks
 - **Tonarm zum Spulen:** Zieh den Tonarm an jede beliebige Stelle im Song.
 - **Drei Looks:** *Schwarz* (nahtlos mit der Notch), *Songfarbe* und **Liquid Glass** – von klar bis milchig.
 - **Fokus-Timer „Lock In“:** Pomodoro mit 25/5 oder 50/10 Minuten, direkt in der Notch und im Vollbild-Plattenspieler.
-- **Wischen zwischen Player und Timer:** Mit zwei Fingern über das Panel wischen – wie beim Durchblättern von Fotos.
-- **Größe nach Wunsch:** Wie groß das Panel aufgeht, lässt sich von 75 % bis 115 % einstellen – mit Live-Vorschau.
+- **Wischen zwischen Player und Timer:** Mit zwei Fingern über das Panel wischen – wie beim Durchblättern von Fotos, so flüssig wie in macOS. Oder einfach auf den Umschalter oben klicken.
+- **Ganz nach deinem Geschmack:** Voreinstellungen (*Kompakt, Standard, Breit, Kino, Hoch*) oder alles selbst einstellen – Größe, Breite, Höhe, Ecken, Cover-Größe, Animation (*Schnell, Weich, Federnd*) und wie schnell sich das Panel schließt. Alles mit Live-Vorschau in der Notch.
 - **Leichtgewichtig:** Im Leerlauf nur ca. 0,1 % CPU und 30 MB Arbeitsspeicher.
 - **Kompatibel mit [Sleeve](https://github.com/zaineldinbarakat-droid/sleeve):** Beide Apps sind aufeinander abgestimmt – sie teilen sich den oberen Bildschirmrand, öffnen nie gleichzeitig, und die Menüleiste kann die Farbe des laufenden Songs übernehmen. Jede App funktioniert aber auch allein.
 
@@ -64,8 +64,7 @@ Spindle ist ein nativer Musikplayer für macOS, der in der Notch deines MacBooks
 - **A turntable in the notch.** Hover the notch and a panel springs out of it, Dynamic-Island style, and tucks back the moment you move away. Show the song as a **spinning vinyl record** — cover art pressed into the label, a tonearm that tracks the playhead — or as the **album cover**.
 - **Drag the tonearm to scrub.** The arm's angle maps exactly to the playhead and back, so you can drop the needle anywhere in the song. A progress bar and play / pause / skip sit beside it.
 - **One click to the source.** Click the cover, the record or the title and Spotify or Music comes to the front.
-- **Swipe between player and timer.** A two-finger swipe across the panel slides between the music and the focus timer, like flipping through photos — or click the switch at the top.
-- **Your size.** Choose how big the panel opens, from 75 % to 115 %; the notch opens as a live preview while you drag the slider.
+- **Swipe between player and timer.** A two-finger swipe across the panel slides between the music and the focus timer, like flipping through photos — the pages follow your fingers and settle the way macOS pages do. Or click the switch at the top: the whole capsule is the button.
 - **Closed, it's a quiet pill.** The cover on the left of the notch, a *now playing* indicator on the right — bars, a wave or a pulse, in the album's colour, white or any colour, with adjustable brightness and glow.
 
   <img src="docs/images/spindle-collapsed.png" alt="The closed notch: a small album cover on the left and glowing bars on the right">
@@ -73,6 +72,19 @@ Spindle ist ein nativer Musikplayer für macOS, der in der Notch deines MacBooks
 - **Three looks.** *Black* (seamless with the hardware notch), *Song Color* (the panel takes on the album's colour) and **Liquid Glass** with a Clarity slider — from genuinely see-through glass that bends the light at its edges to fully frosted.
 
   <img src="docs/images/spindle-liquid-glass.png" alt="The notch panel in clear Liquid Glass over a colourful wallpaper">
+
+- **Make it yours.** Shape the open panel exactly how you like it — with one-click presets (**Compact, Standard, Wide, Cinema, Tall**) or your own mix, previewed live in the notch while you adjust:
+
+  | Setting | What it does |
+  | --- | --- |
+  | **Size** | Scales the whole panel, 75–115 % |
+  | **Width** / **Height** | More room sideways or up and down — the cover and controls keep their size |
+  | **Corners** | From square to very round |
+  | **Cover** | The album cover or record, a little smaller or larger |
+  | **Motion** | How it opens and closes: *Snappy*, *Smooth* or *Bouncy* |
+  | **Closing** | How long it waits after you move away, from instantly to relaxed |
+
+  <img src="docs/images/spindle-panel-shapes.jpg" alt="The same song in the Compact, Wide and Cinema panel shapes">
 
 - **Focus timer — "Lock In".** Pomodoro cycles with a one-tap 25 / 5 ↔ 50 / 10 switch, long breaks, a countdown in the closed notch, notifications, and optional pause-the-music-on-breaks.
 - **Desktop widgets and a full-screen turntable.** Live *Record* and *Turntable* widgets, an optional animated wallpaper, and a full-screen scene (above) with the timer beside the song.
@@ -107,6 +119,8 @@ Each app works fully on its own; together they feel like one. → [**Get Sleeve*
 **Reading and controlling music without any account.** Spindle talks to the *locally running* Music and Spotify apps over **Apple Events** — compiled AppleScript on a serial queue, with Automation permission handled explicitly. The private `MediaRemote` framework was ruled out: Apple restricted it to Apple-signed binaries in macOS 15.4, and it can't seek another app's playhead. Apple Events can, which is what makes drag-to-scrub possible. Updates are **event-driven** from the music apps' own distributed notifications, with a light re-sync poll, and the playhead in between is interpolated from a monotonic clock. Two portability bugs were caught early: AppleScript returns numbers in the *system locale* (`42,5` on some Macs), and `st` / `nd` / `rd` / `th` are reserved words.
 
 **The notch.** Its exact size and position come from the screen's safe-area insets and auxiliary top areas. The panel is a borderless, non-activating window above the menu bar that never resizes — it's always the expanded size and click-through where nothing is drawn — so opening it is a pure spring animation with no window tearing.
+
+**Swiping like macOS.** The tabs sit side by side and follow a two-finger swipe one to one, read from the trackpad's raw scroll phases. Past either end they resist with the same rubber-band curve macOS uses at a scroll view's edge, and on release the finger speed over the last 80 ms decides: a third of the way, or any flick toward the next page, turns it, with a bounce-free spring.
 
 **The tonearm.** Pivot geometry with an exact inverse between the arm's angle and the song's progress (unit-tested to a round-trip error of 1e-15), so dragging the arm seeks precisely.
 

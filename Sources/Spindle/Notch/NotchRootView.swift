@@ -38,7 +38,8 @@ struct NotchRootView: View {
         let expanded = viewModel.isExpanded
         let size = expanded ? expandedSize : collapsedSize
         let shape = NotchShape(topRadius: Theme.notchCornerRadius,
-                               bottomRadius: expanded ? Theme.outerCornerRadius * viewModel.metrics.panelScale
+                               bottomRadius: expanded ? min(CGFloat(viewModel.panelCornerRadius) * viewModel.metrics.panelScale,
+                                                            size.height / 2)
                                                       : Theme.notchCornerRadius)
 
         return ZStack(alignment: .top) {
@@ -66,8 +67,10 @@ struct NotchRootView: View {
             .clipShape(shape)
         }
         .frame(width: size.width, height: size.height)
-        // Resizing from Settings glides rather than jumps.
-        .animation(.spring(response: 0.32, dampingFraction: 0.9), value: viewModel.metrics.panelScale)
+        // Reshaping from Settings glides rather than jumps.
+        .animation(.spring(response: 0.32, dampingFraction: 0.9), value: viewModel.metrics)
+        .animation(.spring(response: 0.32, dampingFraction: 0.9), value: viewModel.panelCornerRadius)
+        .animation(.spring(response: 0.32, dampingFraction: 0.9), value: viewModel.coverScale)
     }
 
     // MARK: - Collapsed
@@ -115,12 +118,12 @@ struct NotchRootView: View {
     // MARK: - Expanded
 
     /// The strip beside the camera at the notch's real height, then the tabs. The tabs
-    /// are laid out at the original design size and scaled as a whole, so a smaller or
-    /// larger panel keeps exactly the same proportions.
+    /// are laid out at their design size (wider or taller if asked — more room, never
+    /// stretched) and scaled as a whole, so Size keeps every proportion.
     private var expandedContent: some View {
         let metrics = viewModel.metrics
         let scale = metrics.panelScale
-        let page = CGSize(width: Theme.expandedWidth, height: Theme.expandedHeight - metrics.notchHeight)
+        let page = metrics.pageSize
 
         return VStack(spacing: 0) {
             header
@@ -148,24 +151,11 @@ struct NotchRootView: View {
         .animation(NotchViewModel.pageSpring, value: viewModel.tab)
         .frame(width: size.width, height: size.height, alignment: .leading)
         .clipped()
-        .overlay(alignment: .bottom) { pageDots(index: index, width: size.width) }
-    }
-
-    /// Two quiet dots: which page you're on, and a hint that you can swipe.
-    private func pageDots(index: CGFloat, width: CGFloat) -> some View {
-        let progress = min(max(index - viewModel.swipeOffset / max(viewModel.metrics.panelSize.width, 1), 0), 1)
-        return HStack(spacing: 5) {
-            Circle().fill(Color.white.opacity(0.18 + 0.42 * (1 - progress))).frame(width: 5, height: 5)
-            Circle().fill(Color.white.opacity(0.18 + 0.42 * progress)).frame(width: 5, height: 5)
-        }
-        .padding(.bottom, 7)
-        .animation(NotchViewModel.pageSpring, value: viewModel.tab)
-        .allowsHitTesting(false)
     }
 
     private var playerBody: some View {
         HStack(alignment: .center, spacing: artworkStyle == .cover ? 18 : 10) {
-            DeckView(size: 124, glow: viewModel.coverGlow)
+            DeckView(size: 124 * CGFloat(viewModel.coverScale), glow: viewModel.coverGlow)
 
             VStack(alignment: .leading, spacing: 10) {
                 TrackInfoView()

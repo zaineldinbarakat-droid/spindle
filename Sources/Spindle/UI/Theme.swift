@@ -71,10 +71,38 @@ extension Animation {
     /// Opening, after the Dynamic Island: the shape springs out of the notch and
     /// settles with the slightest overshoot — enough to feel physical, not bouncy. A
     /// spring keeps its velocity if interrupted, so a quick in-and-out never snaps.
-    static var notch: Animation { .spring(duration: 0.45, bounce: 0.12) }
+    static var notch: Animation { NotchMotion.current.open }
     /// Closing is quicker and doesn't overshoot: it tucks back into the hardware.
-    static var notchClose: Animation { .spring(duration: 0.38, bounce: 0.04) }
+    static var notchClose: Animation { NotchMotion.current.close }
     static var notchQuick: Animation { .spring(response: 0.22, dampingFraction: 0.9) }
+}
+
+/// How the panel springs open and tucks away (Settings → Panel → Motion).
+enum NotchMotion: String, CaseIterable, Identifiable {
+    case snappy, smooth, bouncy
+
+    var id: String { rawValue }
+    var title: String { rawValue.capitalized }
+
+    static var current: NotchMotion {
+        NotchMotion(rawValue: Defaults.string(.notchMotion) ?? "") ?? .smooth
+    }
+
+    var open: Animation {
+        switch self {
+        case .snappy: return .spring(duration: 0.3, bounce: 0.04)
+        case .smooth: return .spring(duration: 0.45, bounce: 0.12)
+        case .bouncy: return .spring(duration: 0.55, bounce: 0.3)
+        }
+    }
+
+    var close: Animation {
+        switch self {
+        case .snappy: return .spring(duration: 0.24, bounce: 0)
+        case .smooth: return .spring(duration: 0.38, bounce: 0.04)
+        case .bouncy: return .spring(duration: 0.44, bounce: 0.14)
+        }
+    }
 }
 
 extension Double {
