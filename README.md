@@ -31,6 +31,24 @@
   <a href="#under-the-hood">Under the hood</a>
 </p>
 
+<details>
+<summary><b>🇩🇪 Auf Deutsch lesen</b></summary>
+
+### Spindle – ein Retro-Plattenspieler in der MacBook-Notch
+
+Spindle ist ein nativer Musikplayer für macOS, der in der Notch deines MacBooks lebt – für **Spotify** und **Apple Music**, mit eingebautem **Fokus-Timer**.
+
+- **Plattenspieler in der Notch:** Fährst du mit der Maus über die Notch, klappt ein Panel heraus – mit drehender Schallplatte (das Albumcover auf dem Label) oder dem Albumcover, Titel und Steuerung.
+- **Tonarm zum Spulen:** Zieh den Tonarm an jede beliebige Stelle im Song.
+- **Drei Looks:** *Schwarz* (nahtlos mit der Notch), *Songfarbe* und **Liquid Glass** – von klar bis milchig.
+- **Fokus-Timer „Lock In“:** Pomodoro mit 25/5 oder 50/10 Minuten, direkt in der Notch und im Vollbild-Plattenspieler.
+- **Leichtgewichtig:** Im Leerlauf nur ca. 0,1 % CPU und 30 MB Arbeitsspeicher.
+- **Kompatibel mit [Sleeve](https://github.com/zaineldinbarakat-droid/sleeve):** Beide Apps sind aufeinander abgestimmt – sie teilen sich den oberen Bildschirmrand, öffnen nie gleichzeitig, und die Menüleiste kann die Farbe des laufenden Songs übernehmen. Jede App funktioniert aber auch allein.
+
+**Installation:** [Spindle.zip herunterladen](https://github.com/zaineldinbarakat-droid/spindle/releases/latest/download/Spindle.zip), entpacken und in **Programme** ziehen. Beim ersten Start unter **Systemeinstellungen → Datenschutz & Sicherheit** auf **Trotzdem öffnen** klicken und Spindle die Steuerung von Musik bzw. Spotify erlauben. Voraussetzung: Mac mit Apple-Chip und macOS 14 oder neuer. Spindle aktualisiert sich selbst.
+
+</details>
+
 <p align="center">
   <img src="docs/images/spindle-fullscreen.jpg" alt="Spindle's full-screen turntable: a walnut deck with a spinning record, the song's details and a focus timer">
 </p>
