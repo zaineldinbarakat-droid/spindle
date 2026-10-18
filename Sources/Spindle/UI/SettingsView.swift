@@ -8,6 +8,8 @@ struct SettingsView: View {
     @EnvironmentObject private var desktop: DesktopController
 
     @State private var launchAtLogin = LaunchAtLogin.isEnabled
+    /// Counts drags of the size slider, so a preview ending late can't cut a new one short.
+    @State private var sizePreview = 0
     @AppStorage(ArtworkStyle.storageKey) private var artworkStyle: ArtworkStyle = .vinyl
     @AppStorage(Defaults.Key.fullScreenTimer.rawValue) private var fullScreenTimer = true
 
@@ -38,6 +40,27 @@ struct SettingsView: View {
                 }
                 Toggle("Glow behind the album cover", isOn: $notch.coverGlow)
                     .help("Off: around the cover is just the notch's own look, with no colour rising from behind it.")
+                LabeledContent("Size") {
+                    HStack {
+                        Text("Smaller").font(.caption).foregroundStyle(.secondary)
+                        Slider(value: $notch.panelScale, in: NotchViewModel.panelScaleRange, step: 0.01,
+                               onEditingChanged: previewSize)
+                        Text("Larger").font(.caption).foregroundStyle(.secondary)
+                        Text("\(Int((notch.panelScale * 100).rounded())) %")
+                            .monospacedDigit()
+                            .frame(width: 44, alignment: .trailing)
+                    }
+                }
+                HStack(alignment: .firstTextBaseline) {
+                    Text("How big the panel opens — the notch opens while you drag, so you can see it. The closed pill always fits your Mac's notch.")
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer()
+                    Button("Reset") {
+                        withAnimation { notch.panelScale = NotchViewModel.defaultPanelScale }
+                    }
+                    .disabled(abs(notch.panelScale - NotchViewModel.defaultPanelScale) < 0.005)
+                }
                 Picker("When closed, show", selection: $notch.collapsedShowsCover) {
                     Text("Album Cover").tag(true)
                     Text("Spinning Record").tag(false)
@@ -206,6 +229,23 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .frame(width: 480, height: 700)
+    }
+
+    /// Opens the notch while the size slider is held, and closes it a moment after
+    /// letting go (unless the cursor has gone up to it).
+    private func previewSize(_ editing: Bool) {
+        sizePreview += 1
+        if editing {
+            notch.isPreviewingSize = true
+            notch.expand()
+            return
+        }
+        let preview = sizePreview
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+            guard preview == sizePreview else { return }
+            notch.isPreviewingSize = false
+            if !notch.metrics.liveZone().contains(NSEvent.mouseLocation) { notch.collapse() }
+        }
     }
 
     private var lookDescription: String {

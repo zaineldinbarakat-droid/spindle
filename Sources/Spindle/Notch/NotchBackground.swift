@@ -89,7 +89,7 @@ struct NotchBackground: View {
 extension NotchBackground {
     /// How far down the panel the notch strip reaches, as a fraction of its height.
     var notchFraction: CGFloat {
-        min(viewModel.metrics.notchHeight / Theme.expandedHeight, 0.5)
+        min(viewModel.metrics.notchHeight / viewModel.metrics.panelSize.height, 0.5)
     }
 
     /// Transparent across the notch strip, opaque below it, with a short fade.

@@ -2,6 +2,11 @@
 
 All notable changes to Spindle.
 
+## 0.6.1 — Swipe and size
+- **Swipe between the player and the timer** with two fingers, like flipping through photos: the pages follow your fingers, rubber-band at the ends and settle with a spring. Two small dots show where you are.
+- The player / timer switch is one big button now — click anywhere on it.
+- **Choose how big the panel opens** (Settings → Notch → Size, 75–115 %), with a live preview while you drag. The default is 10 % smaller than before.
+
 ## 0.6.0 — Its own repository
 - Spindle now lives in its own repository and updates from it. Its companion menu bar manager, [Sleeve](https://github.com/zaineldinbarakat-droid/sleeve), has its own too; the two still work together.
 

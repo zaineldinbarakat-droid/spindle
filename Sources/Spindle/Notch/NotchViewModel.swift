@@ -44,11 +44,33 @@ final class NotchViewModel: ObservableObject {
     /// `$state` is unreachable from other types once the setter is private, so the
     /// window controller gets the stream through here instead.
     var statePublisher: AnyPublisher<State, Never> { $state.eraseToAnyPublisher() }
-    @Published private(set) var metrics: NotchMetrics = .current()
+    @Published private(set) var metrics: NotchMetrics = {
+        var metrics = NotchMetrics.current()
+        metrics.panelScale = CGFloat(Defaults.double(.panelScale, default: NotchViewModel.defaultPanelScale))
+        return metrics
+    }()
     var metricsPublisher: AnyPublisher<NotchMetrics, Never> { $metrics.eraseToAnyPublisher() }
     /// Set while the tonearm is held, so the panel cannot close mid-drag.
     @Published var isInteracting = false
     @Published var tab: Tab = .player
+
+    /// The open panel's size, relative to its original design. A little smaller than
+    /// that by default; Settings → Notch → Size goes from 75 % to 115 %.
+    @Published var panelScale: Double = Defaults.double(.panelScale, default: NotchViewModel.defaultPanelScale) {
+        didSet {
+            Defaults.set(.panelScale, panelScale)
+            metrics.panelScale = CGFloat(panelScale)
+        }
+    }
+    static let defaultPanelScale = 0.9
+    static let panelScaleRange: ClosedRange<Double> = 0.75...Double(NotchMetrics.maxPanelScale)
+    /// Kept open while Settings' size slider is dragged, as a live preview.
+    @Published var isPreviewingSize = false
+
+    /// How far a two-finger swipe has dragged the tabs, in points (0 at rest).
+    @Published var swipeOffset: CGFloat = 0
+    /// The spring tabs settle with, after a swipe or a tap on the switcher.
+    static let pageSpring = Animation.spring(response: 0.38, dampingFraction: 0.86)
     /// Set while Sleeve's Zen mode is on: the whole notch UI steps out of the way.
     @Published var isZenHidden = false
     @Published var style: Style = Style(rawValue: Defaults.string(.notchStyle) ?? "") ?? .songColor {
@@ -164,7 +186,7 @@ final class NotchViewModel: ObservableObject {
     }
 
     func collapse() {
-        guard state != .collapsed, !isInteracting else { return }
+        guard state != .collapsed, !isInteracting, !isPreviewingSize else { return }
         withAnimation(.notchClose) { state = .collapsed }
     }
 
@@ -174,6 +196,8 @@ final class NotchViewModel: ObservableObject {
     }
 
     func updateMetrics(_ new: NotchMetrics) {
+        var new = new
+        new.panelScale = CGFloat(panelScale)
         guard new != metrics else { return }
         metrics = new
     }

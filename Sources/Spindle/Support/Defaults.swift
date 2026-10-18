@@ -16,6 +16,7 @@ enum Defaults {
         case indicatorGlow
         case glassClarity
         case glassTinted
+        case panelScale
         case coverGlow
 
         // Focus timer

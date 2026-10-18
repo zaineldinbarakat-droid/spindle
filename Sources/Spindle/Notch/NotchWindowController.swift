@@ -20,6 +20,7 @@ final class NotchWindowController {
     private var globalMouseMonitor: Any?
     private var localMouseMonitor: Any?
     private var globalClickMonitor: Any?
+    private var scrollMonitor: Any?
     private var cancellables = Set<AnyCancellable>()
     /// Delays closing slightly so a fast diagonal exit doesn't flap the panel.
     private var closeWorkItem: DispatchWorkItem?
@@ -169,11 +170,95 @@ final class NotchWindowController {
             return event
         }
 
+        // Two-finger swipes over the open panel page between the player and the timer.
+        // Scrolls go to the window under the cursor, so a local monitor sees them.
+        scrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
+            guard let self else { return event }
+            return MainActor.assumeIsolated { self.handleScroll(event) } ? nil : event
+        }
+
         // While collapsed the panel is click-through, so clicks on the notch reach us
         // only through a global monitor.
         globalClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDown) { [weak self] _ in
             Task { @MainActor in self?.handleGlobalClick() }
         }
+    }
+
+    // MARK: - Swiping between tabs
+
+    /// Whether the current gesture is a horizontal swipe we're handling: decided on its
+    /// first real movement, so a vertical scroll is never mistaken for one.
+    private var swipeIsHorizontal: Bool?
+    private var swipeTravel: CGFloat = 0
+    private var lastSwipeStep: CGFloat = 0
+
+    /// Pages like a photo strip: the tabs follow the fingers, rubber-band at the ends,
+    /// and on release settle on whichever page you swiped far (or fast) enough toward.
+    /// Returns true when the event was used.
+    private func handleScroll(_ event: NSEvent) -> Bool {
+        guard viewModel.isExpanded, event.window === panel else { return false }
+        // The glide after a swipe we handled: swallow it.
+        if event.momentumPhase != [] { return swipeIsHorizontal == true }
+
+        // A mouse wheel (no phases): one horizontal notch turns the page.
+        if event.phase == [] {
+            guard !event.hasPreciseScrollingDeltas,
+                  abs(event.scrollingDeltaX) > abs(event.scrollingDeltaY) else { return false }
+            turnPage(toward: event.scrollingDeltaX < 0 ? .focus : .player)
+            return true
+        }
+
+        if event.phase.contains(.began) || event.phase.contains(.mayBegin) {
+            swipeIsHorizontal = nil
+            swipeTravel = 0
+            lastSwipeStep = 0
+        }
+        if event.phase.contains(.ended) || event.phase.contains(.cancelled) {
+            guard swipeIsHorizontal == true else { return false }
+            settleSwipe()
+            return true
+        }
+
+        let dx = event.scrollingDeltaX, dy = event.scrollingDeltaY
+        if swipeIsHorizontal == nil {
+            guard abs(dx) + abs(dy) >= 1.5 else { return false }
+            swipeIsHorizontal = abs(dx) > abs(dy)
+        }
+        guard swipeIsHorizontal == true else { return false }
+        swipeTravel += dx
+        lastSwipeStep = dx
+        viewModel.swipeOffset = rubberBanded(swipeTravel)
+        return true
+    }
+
+    /// Past either end the page resists, like a scroll view's edge.
+    private func rubberBanded(_ travel: CGFloat) -> CGFloat {
+        let width = viewModel.metrics.panelSize.width
+        let pastEnd = (viewModel.tab == .player && travel > 0) || (viewModel.tab == .focus && travel < 0)
+        let limited = max(min(travel, width), -width)
+        guard pastEnd else { return limited }
+        return (limited < 0 ? -1 : 1) * width * 0.12 * (1 - exp(-abs(limited) / (width * 0.25)))
+    }
+
+    private func settleSwipe() {
+        let width = viewModel.metrics.panelSize.width
+        let offset = viewModel.swipeOffset
+        var target = viewModel.tab
+        if viewModel.tab == .player && (offset < -width * 0.18 || lastSwipeStep < -9) { target = .focus }
+        if viewModel.tab == .focus && (offset > width * 0.18 || lastSwipeStep > 9) { target = .player }
+        withAnimation(NotchViewModel.pageSpring) {
+            viewModel.tab = target
+            viewModel.swipeOffset = 0
+        }
+    }
+
+    private var lastPageTurn = Date.distantPast
+
+    private func turnPage(toward tab: NotchViewModel.Tab) {
+        // A wheel sends several notches per flick: one page per flick.
+        guard Date.now.timeIntervalSince(lastPageTurn) > 0.35, viewModel.tab != tab else { return }
+        lastPageTurn = .now
+        withAnimation(NotchViewModel.pageSpring) { viewModel.tab = tab }
     }
 
     /// Hover already opens the panel, so this matters when hover-to-open is off: a

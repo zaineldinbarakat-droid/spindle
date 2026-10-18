@@ -10,6 +10,20 @@ struct NotchMetrics: Equatable {
     /// Horizontal centre of the notch in screen coordinates.
     var notchCenterX: CGFloat
     var isRealNotch: Bool
+    /// How big the open panel is drawn, relative to its 500 × 200 pt design. The closed
+    /// pill always matches the hardware notch and doesn't scale.
+    var panelScale: CGFloat = 1
+
+    /// The largest size the setting allows; the window is always big enough for it, so
+    /// changing the size never resizes the window.
+    static let maxPanelScale: CGFloat = 1.15
+
+    /// The open panel's size. The strip beside the camera keeps the notch's real height;
+    /// everything below it scales.
+    var panelSize: CGSize {
+        CGSize(width: Theme.expandedWidth * panelScale,
+               height: notchHeight + (Theme.expandedHeight - notchHeight) * panelScale)
+    }
 
     /// Fallback size for external displays and pre-2021 Macs, where we draw a pill that
     /// behaves like a notch but sits under the menu bar.
@@ -45,8 +59,8 @@ struct NotchMetrics: Equatable {
 
     /// Window frame large enough to hold the expanded panel, anchored to the screen top.
     func windowFrame() -> CGRect {
-        let width = max(Theme.expandedWidth, notchWidth + Theme.collapsedWingWidth * 2) + 80
-        let height = Theme.expandedHeight + 60
+        let width = max(Theme.expandedWidth * Self.maxPanelScale, notchWidth + Theme.collapsedWingWidth * 2) + 80
+        let height = notchHeight + (Theme.expandedHeight - notchHeight) * Self.maxPanelScale + 60
         return CGRect(x: notchCenterX - width / 2,
                       y: screenFrame.maxY - height,
                       width: width,
@@ -79,9 +93,10 @@ struct NotchMetrics: Equatable {
 
     /// Once open, the cursor may roam over the whole panel without it closing.
     func liveZone() -> CGRect {
-        CGRect(x: notchCenterX - Theme.expandedWidth / 2 - 12,
-               y: screenFrame.maxY - Theme.expandedHeight - 12,
-               width: Theme.expandedWidth + 24,
-               height: Theme.expandedHeight + 12 + Self.overshoot)
+        let size = panelSize
+        return CGRect(x: notchCenterX - size.width / 2 - 12,
+                      y: screenFrame.maxY - size.height - 12,
+                      width: size.width + 24,
+                      height: size.height + 12 + Self.overshoot)
     }
 }

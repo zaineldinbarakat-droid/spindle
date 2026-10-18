@@ -32,15 +32,14 @@ struct NotchRootView: View {
                height: viewModel.metrics.notchHeight)
     }
 
-    private var expandedSize: CGSize {
-        CGSize(width: Theme.expandedWidth, height: Theme.expandedHeight)
-    }
+    private var expandedSize: CGSize { viewModel.metrics.panelSize }
 
     private var island: some View {
         let expanded = viewModel.isExpanded
         let size = expanded ? expandedSize : collapsedSize
         let shape = NotchShape(topRadius: Theme.notchCornerRadius,
-                               bottomRadius: expanded ? Theme.outerCornerRadius : Theme.notchCornerRadius)
+                               bottomRadius: expanded ? Theme.outerCornerRadius * viewModel.metrics.panelScale
+                                                      : Theme.notchCornerRadius)
 
         return ZStack(alignment: .top) {
             NotchBackground(shape: shape, isExpanded: expanded)
@@ -67,6 +66,8 @@ struct NotchRootView: View {
             .clipShape(shape)
         }
         .frame(width: size.width, height: size.height)
+        // Resizing from Settings glides rather than jumps.
+        .animation(.spring(response: 0.32, dampingFraction: 0.9), value: viewModel.metrics.panelScale)
     }
 
     // MARK: - Collapsed
@@ -113,27 +114,53 @@ struct NotchRootView: View {
 
     // MARK: - Expanded
 
+    /// The strip beside the camera at the notch's real height, then the tabs. The tabs
+    /// are laid out at the original design size and scaled as a whole, so a smaller or
+    /// larger panel keeps exactly the same proportions.
     private var expandedContent: some View {
-        VStack(spacing: 0) {
+        let metrics = viewModel.metrics
+        let scale = metrics.panelScale
+        let page = CGSize(width: Theme.expandedWidth, height: Theme.expandedHeight - metrics.notchHeight)
+
+        return VStack(spacing: 0) {
             header
-                .frame(height: viewModel.metrics.notchHeight)
+                .frame(height: metrics.notchHeight)
 
-            Spacer(minLength: 0)
-
-            Group {
-                switch viewModel.tab {
-                case .player:
-                    playerBody
-                        .transition(.opacity)
-                case .focus:
-                    FocusView(dialSize: 112, compact: true)
-                        .transition(.opacity)
-                }
-            }
-            .animation(.notchQuick, value: viewModel.tab)
-
-            Spacer(minLength: 0)
+            pages(size: page, scale: scale)
+                .frame(width: page.width, height: page.height)
+                .scaleEffect(scale, anchor: .top)
+                .frame(width: page.width * scale, height: page.height * scale, alignment: .top)
         }
+    }
+
+    /// The player and the timer side by side, like photos in a strip: a two-finger swipe
+    /// drags them (see NotchWindowController) and they settle on a page with a spring.
+    private func pages(size: CGSize, scale: CGFloat) -> some View {
+        let index: CGFloat = viewModel.tab == .player ? 0 : 1
+        return HStack(spacing: 0) {
+            playerBody
+                .frame(width: size.width, height: size.height)
+            FocusView(dialSize: 112, compact: true)
+                .frame(width: size.width, height: size.height)
+        }
+        .frame(width: size.width, height: size.height, alignment: .leading)
+        .offset(x: -index * size.width + viewModel.swipeOffset / max(scale, 0.1))
+        .animation(NotchViewModel.pageSpring, value: viewModel.tab)
+        .frame(width: size.width, height: size.height, alignment: .leading)
+        .clipped()
+        .overlay(alignment: .bottom) { pageDots(index: index, width: size.width) }
+    }
+
+    /// Two quiet dots: which page you're on, and a hint that you can swipe.
+    private func pageDots(index: CGFloat, width: CGFloat) -> some View {
+        let progress = min(max(index - viewModel.swipeOffset / max(viewModel.metrics.panelSize.width, 1), 0), 1)
+        return HStack(spacing: 5) {
+            Circle().fill(Color.white.opacity(0.18 + 0.42 * (1 - progress))).frame(width: 5, height: 5)
+            Circle().fill(Color.white.opacity(0.18 + 0.42 * progress)).frame(width: 5, height: 5)
+        }
+        .padding(.bottom, 7)
+        .animation(NotchViewModel.pageSpring, value: viewModel.tab)
+        .allowsHitTesting(false)
     }
 
     private var playerBody: some View {
@@ -161,7 +188,7 @@ struct NotchRootView: View {
     private var header: some View {
         let metrics = viewModel.metrics
 
-        let wingWidth = (Theme.expandedWidth - metrics.notchWidth) / 2
+        let wingWidth = (metrics.panelSize.width - metrics.notchWidth) / 2
 
         return HStack(spacing: 0) {
             // Left of the notch stays empty: the album cover is how you open the app.
@@ -201,39 +228,53 @@ struct NotchRootView: View {
     }
 }
 
-/// Record / timer toggle in the header.
+/// Record / timer switch in the header. The whole capsule is one button — anywhere on
+/// it flips to the other tab — and the highlight slides across like the pages do.
 private struct TabSwitcher: View {
     @EnvironmentObject private var viewModel: NotchViewModel
     @EnvironmentObject private var timer: PomodoroTimer
+    @State private var isHovering = false
 
     var body: some View {
-        HStack(spacing: 2) {
-            tabButton(.player, symbol: "opticaldisc.fill", help: "Turntable")
-            tabButton(.focus, symbol: "timer", help: "Focus timer")
-        }
-        .padding(2)
-        .background(Capsule().fill(Color.white.opacity(0.08)))
-    }
-
-    private func tabButton(_ tab: NotchViewModel.Tab, symbol: String, help: String) -> some View {
-        let selected = viewModel.tab == tab
-        return Button {
-            viewModel.tab = tab
+        Button {
+            withAnimation(NotchViewModel.pageSpring) {
+                viewModel.tab = viewModel.tab == .player ? .focus : .player
+            }
         } label: {
-            Image(systemName: symbol)
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(selected ? Color.white : Theme.tertiaryText)
-                // A running timer tints its tab so it's visible from the player side.
-                .overlay(alignment: .topTrailing) {
-                    if tab == .focus && timer.isRunning && !selected {
-                        Circle().fill(timer.phase.color).frame(width: 4, height: 4).offset(x: 3, y: -2)
-                    }
+            ZStack(alignment: viewModel.tab == .player ? .leading : .trailing) {
+                Capsule().fill(Color.white.opacity(isHovering ? 0.12 : 0.08))
+                Capsule().fill(Color.white.opacity(0.2))
+                    .frame(width: 28)
+                    .padding(2)
+                HStack(spacing: 0) {
+                    icon(.player, symbol: "opticaldisc.fill")
+                    icon(.focus, symbol: "timer")
                 }
-                .frame(width: 22, height: 16)
-                .background(Capsule().fill(Color.white.opacity(selected ? 0.18 : 0)))
+                .padding(2)
+            }
+            .frame(width: 60, height: 24)
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
-        .help(help)
+        .onHover { isHovering = $0 }
+        .animation(NotchViewModel.pageSpring, value: viewModel.tab)
+        .animation(.easeOut(duration: 0.15), value: isHovering)
+        .help(viewModel.tab == .player ? "Show the focus timer (or swipe with two fingers)"
+                                       : "Show the player (or swipe with two fingers)")
+    }
+
+    private func icon(_ tab: NotchViewModel.Tab, symbol: String) -> some View {
+        let selected = viewModel.tab == tab
+        return Image(systemName: symbol)
+            .font(.system(size: 10.5, weight: .semibold))
+            .foregroundStyle(selected ? Color.white : Theme.tertiaryText)
+            // A running timer tints its tab so it's visible from the player side.
+            .overlay(alignment: .topTrailing) {
+                if tab == .focus && timer.isRunning && !selected {
+                    Circle().fill(timer.phase.color).frame(width: 4, height: 4).offset(x: 3, y: -2)
+                }
+            }
+            .frame(width: 28, height: 20)
     }
 }
 

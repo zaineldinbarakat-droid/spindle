@@ -42,6 +42,8 @@ Spindle ist ein nativer Musikplayer für macOS, der in der Notch deines MacBooks
 - **Tonarm zum Spulen:** Zieh den Tonarm an jede beliebige Stelle im Song.
 - **Drei Looks:** *Schwarz* (nahtlos mit der Notch), *Songfarbe* und **Liquid Glass** – von klar bis milchig.
 - **Fokus-Timer „Lock In“:** Pomodoro mit 25/5 oder 50/10 Minuten, direkt in der Notch und im Vollbild-Plattenspieler.
+- **Wischen zwischen Player und Timer:** Mit zwei Fingern über das Panel wischen – wie beim Durchblättern von Fotos.
+- **Größe nach Wunsch:** Wie groß das Panel aufgeht, lässt sich von 75 % bis 115 % einstellen – mit Live-Vorschau.
 - **Leichtgewichtig:** Im Leerlauf nur ca. 0,1 % CPU und 30 MB Arbeitsspeicher.
 - **Kompatibel mit [Sleeve](https://github.com/zaineldinbarakat-droid/sleeve):** Beide Apps sind aufeinander abgestimmt – sie teilen sich den oberen Bildschirmrand, öffnen nie gleichzeitig, und die Menüleiste kann die Farbe des laufenden Songs übernehmen. Jede App funktioniert aber auch allein.
 
@@ -62,6 +64,8 @@ Spindle ist ein nativer Musikplayer für macOS, der in der Notch deines MacBooks
 - **A turntable in the notch.** Hover the notch and a panel springs out of it, Dynamic-Island style, and tucks back the moment you move away. Show the song as a **spinning vinyl record** — cover art pressed into the label, a tonearm that tracks the playhead — or as the **album cover**.
 - **Drag the tonearm to scrub.** The arm's angle maps exactly to the playhead and back, so you can drop the needle anywhere in the song. A progress bar and play / pause / skip sit beside it.
 - **One click to the source.** Click the cover, the record or the title and Spotify or Music comes to the front.
+- **Swipe between player and timer.** A two-finger swipe across the panel slides between the music and the focus timer, like flipping through photos — or click the switch at the top.
+- **Your size.** Choose how big the panel opens, from 75 % to 115 %; the notch opens as a live preview while you drag the slider.
 - **Closed, it's a quiet pill.** The cover on the left of the notch, a *now playing* indicator on the right — bars, a wave or a pulse, in the album's colour, white or any colour, with adjustable brightness and glow.
 
   <img src="docs/images/spindle-collapsed.png" alt="The closed notch: a small album cover on the left and glowing bars on the right">

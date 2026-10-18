@@ -1,5 +1,5 @@
 {
-  "version": "0.6.0",
-  "notes": "Spindle now lives in its own repository (github.com/zaineldinbarakat-droid/spindle) and updates from it. Its companion, Sleeve, has its own; they still work together.",
+  "version": "0.6.1",
+  "notes": "Swipe with two fingers between the player and the timer, like flipping through photos. The player/timer switch is one big button. Choose how big the panel opens in Settings → Notch → Size (default 10% smaller), with a live preview.",
   "minimumSystemVersion": "14.0"
 }
