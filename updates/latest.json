@@ -1,5 +1,5 @@
 {
-  "version": "0.6.6",
-  "notes": "A record that looks real, with a finer tonearm and spindle pin, and no more cut-off record in the open notch. Settings → Record sets the album art's size and turns the pin off. Settings opens on a short list of categories. The timer has a back button.",
+  "version": "0.6.7",
+  "notes": "Record speed (8⅓ to 78 rpm), album art that can hold still, and a record whose turning you can see. The tonearm sits a little lower. Lighter on the battery, especially with the display asleep.",
   "minimumSystemVersion": "14.0"
 }

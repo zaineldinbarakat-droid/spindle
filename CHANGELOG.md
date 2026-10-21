@@ -2,6 +2,14 @@
 
 All notable changes to Spindle.
 
+## 0.6.7 — Turntable controls, lighter
+- **Speed:** Settings → Record turns the record at 8⅓, 16⅔, 33⅓, 45 or 78 rpm. 16⅔ by default.
+- **Album art can hold still** while the record turns underneath it.
+- **Show the record turning:** perfect grooves look still as they turn, so the lamp's reflection sways a little once a turn, the way it does on a real (never quite flat) record. On by default.
+- **The tonearm sits a little lower**, clearer of the MacBook's notch.
+- **New defaults:** the closed notch shows the spinning record, the waves are white without glow, the album art is larger and the spindle pin is off.
+- **Lighter on the battery:** each check-in with Spotify or Music asks for 3 values instead of 8 or 9 (the rest only when the song changes); the live waves and the polling pause while the display sleeps; and a closed Settings window stops redrawing.
+
 ## 0.6.6 — A real record, cleaner Settings
 - **A record that looks real:** the light no longer spins with the disc. Two fixed highlights run along the fine grooves the way a lamp catches real vinyl, with smooth bands between tracks, a glossy lead-in and run-out, a bevelled rim and a brushed-metal platter under it.
 - **No more cut-off record:** the record and tonearm sat a little too high in the open notch and were clipped flat under the strip beside the camera. They now sit fully in view.
