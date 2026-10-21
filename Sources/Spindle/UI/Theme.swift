@@ -42,7 +42,9 @@ enum Theme {
         static let grooveOuterFraction: CGFloat = 0.97
         static let rpm: Double = 33 + 1.0 / 3.0
         /// The speeds a turntable offers, for Settings → Record.
-        static let speeds: [(rpm: Double, title: String)] = [(33 + 1.0 / 3.0, "33⅓"), (45, "45"), (78, "78")]
+        static let speeds: [(rpm: Double, title: String)] = [
+            (8 + 1.0 / 3.0, "8⅓"), (16 + 2.0 / 3.0, "16⅔"), (33 + 1.0 / 3.0, "33⅓"), (45, "45"), (78, "78")
+        ]
     }
 }
 

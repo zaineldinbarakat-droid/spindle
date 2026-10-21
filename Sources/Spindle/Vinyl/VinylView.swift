@@ -46,14 +46,22 @@ struct VinylView: View {
         var showsSpin: Bool
     }
 
+    @State private var lightImage: CGImage?
+
     var body: some View {
         GeometryReader { geo in
             let size = min(geo.size.width, geo.size.height)
 
             ZStack {
-                VinylSurface(labelFraction: labelFraction)
+                // Showing the spin, the lamp's reflection is its own layer so it can sway
+                // the way it does on a real (never perfectly flat) record.
+                VinylSurface(labelFraction: labelFraction, includesLight: !showsSpin)
                     .frame(width: size, height: size)
                     .drawingGroup()
+                if showsSpin {
+                    SwayingLayer(image: lightImage, isSwaying: isSpinning, period: 360 / max(degreesPerSecond, 1))
+                        .frame(width: size, height: size)
+                }
                 SpinningLayer(image: rotatingImage, isSpinning: isSpinning, degreesPerSecond: degreesPerSecond)
                     .frame(width: size, height: size)
                 if !labelSpins {
@@ -74,6 +82,14 @@ struct VinylView: View {
                 let renderer = ImageRenderer(content: rotatingDisc(size: size))
                 renderer.scale = displayScale
                 rotatingImage = renderer.cgImage
+                if showsSpin {
+                    let light = ImageRenderer(content: VinylLight(labelFraction: labelFraction)
+                        .frame(width: size, height: size))
+                    light.scale = displayScale
+                    lightImage = light.cgImage
+                } else {
+                    lightImage = nil
+                }
             }
         }
     }
@@ -83,7 +99,7 @@ struct VinylView: View {
     private func rotatingDisc(size: CGFloat) -> some View {
         ZStack {
             if showsSpin {
-                spinTexture(size: size)
+                dust(size: size)
             }
             matrixEtching(size: size)
             if labelSpins {
@@ -93,42 +109,34 @@ struct VinylView: View {
         .frame(width: size, height: size)
     }
 
-    /// What makes a turning record visible: a real pressing's grooves catch the light a
-    /// little unevenly around the disc, and there's always some dust. Faint, uneven
-    /// sheen bands and a few specks in the grooves, turning with the record.
-    private func spinTexture(size: CGFloat) -> some View {
-        let zones = VinylZones(radius: size / 2, labelFraction: labelFraction)
-        let band = zones.outerGroove - zones.runOut
-        let specks: [(angle: Double, radius: CGFloat, size: CGFloat)] = [
-            (0.4, 0.88, 1.0), (1.9, 0.62, 0.8), (2.6, 0.79, 1.2), (3.9, 0.55, 0.7), (5.1, 0.71, 0.9)
+    /// The dust every played record carries: a few soft specks and a stray fibre, sitting
+    /// in the grooves and turning with them.
+    private func dust(size: CGFloat) -> some View {
+        let specks: [(angle: Double, radius: CGFloat, scale: CGFloat, opacity: Double)] = [
+            (0.5, 0.87, 1.0, 0.42), (2.3, 0.64, 0.7, 0.32), (3.6, 0.76, 0.85, 0.36), (5.2, 0.53, 0.6, 0.28)
         ]
+        let fibreAngle = 4.3
+        let fibreRadius = size / 2 * 0.70
         return ZStack {
-            Circle()
-                .fill(AngularGradient(gradient: Gradient(stops: [
-                    .init(color: .white.opacity(0.00), location: 0.00),
-                    .init(color: .white.opacity(0.14), location: 0.06),
-                    .init(color: .white.opacity(0.00), location: 0.15),
-                    .init(color: .white.opacity(0.00), location: 0.31),
-                    .init(color: .white.opacity(0.09), location: 0.38),
-                    .init(color: .white.opacity(0.00), location: 0.47),
-                    .init(color: .white.opacity(0.00), location: 0.61),
-                    .init(color: .white.opacity(0.16), location: 0.70),
-                    .init(color: .white.opacity(0.00), location: 0.80),
-                    .init(color: .white.opacity(0.00), location: 1.00)
-                ]), center: .center))
-                .mask(
-                    Circle()
-                        .strokeBorder(Color.black, lineWidth: band)
-                        .frame(width: zones.outerGroove * 2, height: zones.outerGroove * 2)
-                )
             ForEach(specks.indices, id: \.self) { index in
                 let speck = specks[index]
+                let diameter = max(size * 0.009 * speck.scale, 0.8)
                 Circle()
-                    .fill(Color.white.opacity(0.35))
-                    .frame(width: max(size * 0.006 * speck.size, 0.6), height: max(size * 0.006 * speck.size, 0.6))
+                    .fill(RadialGradient(colors: [.white.opacity(speck.opacity), .white.opacity(0)],
+                                         center: .center, startRadius: 0, endRadius: diameter / 2))
+                    .frame(width: diameter, height: diameter)
                     .offset(x: cos(speck.angle) * size / 2 * speck.radius,
                             y: sin(speck.angle) * size / 2 * speck.radius)
             }
+            // A short, curled fibre lying across a few grooves.
+            Path { path in
+                let start = CGPoint(x: size / 2 + cos(fibreAngle) * fibreRadius,
+                                    y: size / 2 + sin(fibreAngle) * fibreRadius)
+                path.move(to: start)
+                path.addQuadCurve(to: CGPoint(x: start.x + size * 0.035, y: start.y + size * 0.012),
+                                  control: CGPoint(x: start.x + size * 0.012, y: start.y - size * 0.014))
+            }
+            .stroke(Color.white.opacity(0.22), style: StrokeStyle(lineWidth: max(size * 0.0025, 0.35), lineCap: .round))
         }
         .frame(width: size, height: size)
     }
@@ -226,9 +234,11 @@ struct VinylView: View {
 }
 
 /// The record's surface, lit from the upper left: everything on a record that doesn't
-/// turn visibly when it plays.
+/// turn visibly when it plays. Without `includesLight`, just the vinyl: `VinylLight`
+/// then draws the lamp's reflection as a layer of its own.
 private struct VinylSurface: View {
     var labelFraction: CGFloat
+    var includesLight = true
 
     var body: some View {
         Canvas { context, canvas in
@@ -273,42 +283,9 @@ private struct VinylSurface: View {
                 context.stroke(circle(locked), with: .color(.white.opacity(0.10)), lineWidth: hairline)
             }
 
-            // The lamp: two opposed wedges of light that only the grooves pick up, as
-            // streaks along them. Brighter toward the light (upper left).
-            let light = Gradient(stops: [
-                .init(color: .white.opacity(1.00), location: 0.000),
-                .init(color: .white.opacity(0.42), location: 0.025),
-                .init(color: .white.opacity(0.00), location: 0.080),
-                .init(color: .white.opacity(0.00), location: 0.420),
-                .init(color: .white.opacity(0.24), location: 0.475),
-                .init(color: .white.opacity(0.62), location: 0.500),
-                .init(color: .white.opacity(0.24), location: 0.525),
-                .init(color: .white.opacity(0.00), location: 0.580),
-                .init(color: .white.opacity(0.00), location: 0.920),
-                .init(color: .white.opacity(0.42), location: 0.975),
-                .init(color: .white.opacity(1.00), location: 1.000)
-            ])
-            let lampAngle = Angle.degrees(225) // pointing up and to the left, on screen
-            context.drawLayer { layer in
-                for groove in grooves {
-                    layer.stroke(circle(groove.radius), with: .color(.white.opacity(0.55 + groove.texture * 4)),
-                                 lineWidth: hairline * 1.2)
-                }
-                layer.blendMode = .sourceIn
-                layer.fill(disc, with: .conicGradient(light, center: center, angle: lampAngle))
+            if includesLight {
+                Self.drawLight(in: &context, size: size, center: center, grooves: grooves)
             }
-
-            // The gloss on top: the same light as a broad, soft sheen over the whole disc.
-            let gloss = Gradient(stops: [
-                .init(color: .white.opacity(0.09), location: 0.00),
-                .init(color: .white.opacity(0.00), location: 0.12),
-                .init(color: .white.opacity(0.00), location: 0.38),
-                .init(color: .white.opacity(0.05), location: 0.50),
-                .init(color: .white.opacity(0.00), location: 0.62),
-                .init(color: .white.opacity(0.00), location: 0.88),
-                .init(color: .white.opacity(0.09), location: 1.00)
-            ])
-            context.fill(disc, with: .conicGradient(gloss, center: center, angle: lampAngle))
 
             // The rim: rounded over, so it catches the light on the lamp's side and
             // falls into shadow on the other.
@@ -319,6 +296,67 @@ private struct VinylSurface: View {
                                                  endPoint: CGPoint(x: center.x + radius, y: center.y + radius)),
                            lineWidth: bevel)
             context.stroke(circle(radius - bevel * 1.5), with: .color(.black.opacity(0.6)), lineWidth: bevel * 0.6)
+        }
+    }
+
+    /// The lamp: two opposed wedges of light that only the grooves pick up, as streaks
+    /// along them (brighter toward the light, upper left), and a broad, soft gloss.
+    static func drawLight(in context: inout GraphicsContext, size: CGFloat, center: CGPoint,
+                          grooves: [VinylZones.Groove]) {
+        let radius = size / 2
+        func circle(_ r: CGFloat) -> Path {
+            Path(ellipseIn: CGRect(x: center.x - r, y: center.y - r, width: r * 2, height: r * 2))
+        }
+        let disc = circle(radius)
+        let hairline = max(size * 0.0018, 0.3)
+        let light = Gradient(stops: [
+            .init(color: .white.opacity(1.00), location: 0.000),
+            .init(color: .white.opacity(0.42), location: 0.025),
+            .init(color: .white.opacity(0.00), location: 0.080),
+            .init(color: .white.opacity(0.00), location: 0.420),
+            .init(color: .white.opacity(0.24), location: 0.475),
+            .init(color: .white.opacity(0.62), location: 0.500),
+            .init(color: .white.opacity(0.24), location: 0.525),
+            .init(color: .white.opacity(0.00), location: 0.580),
+            .init(color: .white.opacity(0.00), location: 0.920),
+            .init(color: .white.opacity(0.42), location: 0.975),
+            .init(color: .white.opacity(1.00), location: 1.000)
+        ])
+        let lampAngle = Angle.degrees(225) // pointing up and to the left, on screen
+        context.drawLayer { layer in
+            for groove in grooves {
+                layer.stroke(circle(groove.radius), with: .color(.white.opacity(0.55 + groove.texture * 4)),
+                             lineWidth: hairline * 1.2)
+            }
+            layer.blendMode = .sourceIn
+            layer.fill(disc, with: .conicGradient(light, center: center, angle: lampAngle))
+        }
+
+        // The gloss on top: the same light as a broad, soft sheen over the whole disc.
+        let gloss = Gradient(stops: [
+            .init(color: .white.opacity(0.09), location: 0.00),
+            .init(color: .white.opacity(0.00), location: 0.12),
+            .init(color: .white.opacity(0.00), location: 0.38),
+            .init(color: .white.opacity(0.05), location: 0.50),
+            .init(color: .white.opacity(0.00), location: 0.62),
+            .init(color: .white.opacity(0.00), location: 0.88),
+            .init(color: .white.opacity(0.09), location: 1.00)
+        ])
+        context.fill(disc, with: .conicGradient(gloss, center: center, angle: lampAngle))
+    }
+}
+
+/// The lamp's reflection on its own, for `SwayingLayer` to move.
+private struct VinylLight: View {
+    var labelFraction: CGFloat
+
+    var body: some View {
+        Canvas { context, canvas in
+            let size = min(canvas.width, canvas.height)
+            let zones = VinylZones(radius: size / 2, labelFraction: labelFraction)
+            VinylSurface.drawLight(in: &context, size: size,
+                                   center: CGPoint(x: canvas.width / 2, y: canvas.height / 2),
+                                   grooves: zones.grooves(size: size))
         }
     }
 }
@@ -376,6 +414,89 @@ private struct VinylZones {
                                  isLeadIn: r > leadIn))
         }
         return result
+    }
+}
+
+/// The lamp's reflection on a record that isn't perfectly flat — none is: as the record
+/// turns, the reflection sways a few degrees and dims a little as the warp tips it
+/// away, once per turn. That, not the light turning with the record, is how a real
+/// one gives its spin away. Core Animation does the moving.
+struct SwayingLayer: NSViewRepresentable {
+    var image: CGImage?
+    var isSwaying: Bool
+    /// One turn of the record, in seconds.
+    var period: Double
+
+    func makeNSView(context: Context) -> SwayingLayerView { SwayingLayerView() }
+
+    func updateNSView(_ view: SwayingLayerView, context: Context) {
+        view.update(image: image, swaying: isSwaying, period: period)
+    }
+}
+
+final class SwayingLayerView: NSView {
+    private let light = CALayer()
+    private var isSwaying = false
+    private var period: Double = 0
+
+    init() {
+        super.init(frame: .zero)
+        layer = CALayer()
+        wantsLayer = true
+        light.contentsGravity = .resizeAspect
+        layer?.addSublayer(light)
+    }
+
+    required init?(coder: NSCoder) { fatalError("not used") }
+
+    override func layout() {
+        super.layout()
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        light.bounds = bounds
+        light.position = CGPoint(x: bounds.midX, y: bounds.midY)
+        CATransaction.commit()
+    }
+
+    func update(image: CGImage?, swaying: Bool, period: Double) {
+        if (light.contents as! CGImage?) !== image {
+            light.contents = image
+        }
+        guard swaying != isSwaying || (swaying && period != self.period) else { return }
+        isSwaying = swaying
+        self.period = period
+
+        let current = (light.presentation() ?? light).value(forKeyPath: "transform.rotation.z") as? CGFloat ?? 0
+        light.removeAllAnimations()
+        guard swaying, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
+            // Settle back where the light rests, rather than snapping.
+            let settle = CABasicAnimation(keyPath: "transform.rotation.z")
+            settle.fromValue = current
+            settle.toValue = 0
+            settle.duration = 0.5
+            settle.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            light.add(settle, forKey: "settle")
+            return
+        }
+
+        let ease = CAMediaTimingFunction(name: .easeInEaseOut)
+        let amount = 3 * Double.pi / 180
+        let sway = CAKeyframeAnimation(keyPath: "transform.rotation.z")
+        sway.values = [0, amount, 0, -amount, 0]
+        sway.keyTimes = [0, 0.25, 0.5, 0.75, 1]
+        sway.timingFunctions = Array(repeating: ease, count: 4)
+        sway.duration = period
+        sway.repeatCount = .infinity
+        light.add(sway, forKey: "sway")
+
+        let dim = CAKeyframeAnimation(keyPath: "opacity")
+        dim.values = [1, 0.8, 1]
+        dim.keyTimes = [0, 0.5, 1]
+        dim.timingFunctions = [ease, ease]
+        dim.duration = period
+        dim.timeOffset = period * 0.25   // dimmest as it sways furthest one way
+        dim.repeatCount = .infinity
+        light.add(dim, forKey: "dim")
     }
 }
 
