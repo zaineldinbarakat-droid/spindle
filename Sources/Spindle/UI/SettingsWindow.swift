@@ -6,6 +6,7 @@ import SwiftUI
 @MainActor
 enum SettingsWindow {
     private static var window: NSWindow?
+    private static var closeObserver: NSObjectProtocol?
 
     static func show() {
         if let window {
@@ -32,6 +33,18 @@ enum SettingsWindow {
         created.center()
 
         window = created
+        // Closed, Settings lets go of its views. Kept alive, they redrew with every tick
+        // of the song and the timer (and spun the record preview), with nobody looking.
+        closeObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification, object: created, queue: .main
+        ) { _ in
+            MainActor.assumeIsolated {
+                if let closeObserver { NotificationCenter.default.removeObserver(closeObserver) }
+                closeObserver = nil
+                window?.contentView = nil
+                window = nil
+            }
+        }
         NSApp.activate(ignoringOtherApps: true)
         created.makeKeyAndOrderFront(nil)
     }

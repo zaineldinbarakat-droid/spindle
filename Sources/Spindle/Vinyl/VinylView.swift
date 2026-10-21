@@ -16,15 +16,22 @@ struct VinylView: View {
     var artwork: NSImage?
     var accent: Color
     var isSpinning: Bool
-    var rpm: Double = Theme.Record.rpm
+    /// Overrides the speed chosen in Settings → Record.
+    var rpm: Double?
 
     @State private var rotatingImage: CGImage?
     @Environment(\.displayScale) private var displayScale
     /// Settings → Record. AppStorage, so every record (notch, widgets, wallpaper) follows.
     @AppStorage(Defaults.Key.showsSpindlePin.rawValue) private var showsPin = true
     @AppStorage(Defaults.Key.recordLabelSize.rawValue) private var labelSize = Double(Theme.Record.labelFraction)
+    @AppStorage(Defaults.Key.recordRPM.rawValue) private var storedRPM = Theme.Record.rpm
+    /// Off: the album art holds still while the record turns under it.
+    @AppStorage(Defaults.Key.labelSpins.rawValue) private var labelSpins = true
+    /// Faint, uneven sheen and dust in the grooves that turn with the record, so the
+    /// spin shows on the vinyl itself (perfect grooves look still when they turn).
+    @AppStorage(Defaults.Key.showsSpin.rawValue) private var showsSpin = false
 
-    private var degreesPerSecond: Double { rpm * 6 }
+    private var degreesPerSecond: Double { (rpm ?? storedRPM) * 6 }
     private var labelFraction: CGFloat {
         CGFloat(min(max(labelSize, Theme.Record.labelFractionRange.lowerBound), Theme.Record.labelFractionRange.upperBound))
     }
@@ -35,6 +42,8 @@ struct VinylView: View {
         var accent: Color
         var scale: CGFloat
         var labelFraction: CGFloat
+        var labelSpins: Bool
+        var showsSpin: Bool
     }
 
     var body: some View {
@@ -47,6 +56,9 @@ struct VinylView: View {
                     .drawingGroup()
                 SpinningLayer(image: rotatingImage, isSpinning: isSpinning, degreesPerSecond: degreesPerSecond)
                     .frame(width: size, height: size)
+                if !labelSpins {
+                    label(size: size)
+                }
                 if showsPin {
                     spindle(size: size)
                         .transition(.opacity)
@@ -56,7 +68,8 @@ struct VinylView: View {
             .frame(width: size, height: size)
             .frame(width: geo.size.width, height: geo.size.height)
             .task(id: RenderKey(size: size, artwork: artwork.map(ObjectIdentifier.init),
-                                accent: accent, scale: displayScale, labelFraction: labelFraction)) {
+                                accent: accent, scale: displayScale, labelFraction: labelFraction,
+                                labelSpins: labelSpins, showsSpin: showsSpin)) {
                 guard size > 0 else { return }
                 let renderer = ImageRenderer(content: rotatingDisc(size: size))
                 renderer.scale = displayScale
@@ -69,8 +82,53 @@ struct VinylView: View {
 
     private func rotatingDisc(size: CGFloat) -> some View {
         ZStack {
+            if showsSpin {
+                spinTexture(size: size)
+            }
             matrixEtching(size: size)
-            label(size: size)
+            if labelSpins {
+                label(size: size)
+            }
+        }
+        .frame(width: size, height: size)
+    }
+
+    /// What makes a turning record visible: a real pressing's grooves catch the light a
+    /// little unevenly around the disc, and there's always some dust. Faint, uneven
+    /// sheen bands and a few specks in the grooves, turning with the record.
+    private func spinTexture(size: CGFloat) -> some View {
+        let zones = VinylZones(radius: size / 2, labelFraction: labelFraction)
+        let band = zones.outerGroove - zones.runOut
+        let specks: [(angle: Double, radius: CGFloat, size: CGFloat)] = [
+            (0.4, 0.88, 1.0), (1.9, 0.62, 0.8), (2.6, 0.79, 1.2), (3.9, 0.55, 0.7), (5.1, 0.71, 0.9)
+        ]
+        return ZStack {
+            Circle()
+                .fill(AngularGradient(gradient: Gradient(stops: [
+                    .init(color: .white.opacity(0.00), location: 0.00),
+                    .init(color: .white.opacity(0.14), location: 0.06),
+                    .init(color: .white.opacity(0.00), location: 0.15),
+                    .init(color: .white.opacity(0.00), location: 0.31),
+                    .init(color: .white.opacity(0.09), location: 0.38),
+                    .init(color: .white.opacity(0.00), location: 0.47),
+                    .init(color: .white.opacity(0.00), location: 0.61),
+                    .init(color: .white.opacity(0.16), location: 0.70),
+                    .init(color: .white.opacity(0.00), location: 0.80),
+                    .init(color: .white.opacity(0.00), location: 1.00)
+                ]), center: .center))
+                .mask(
+                    Circle()
+                        .strokeBorder(Color.black, lineWidth: band)
+                        .frame(width: zones.outerGroove * 2, height: zones.outerGroove * 2)
+                )
+            ForEach(specks.indices, id: \.self) { index in
+                let speck = specks[index]
+                Circle()
+                    .fill(Color.white.opacity(0.35))
+                    .frame(width: max(size * 0.006 * speck.size, 0.6), height: max(size * 0.006 * speck.size, 0.6))
+                    .offset(x: cos(speck.angle) * size / 2 * speck.radius,
+                            y: sin(speck.angle) * size / 2 * speck.radius)
+            }
         }
         .frame(width: size, height: size)
     }
@@ -338,6 +396,7 @@ struct SpinningLayer: NSViewRepresentable {
 final class SpinningLayerView: NSView {
     private let disc = CALayer()
     private var isSpinning = false
+    private var degreesPerSecond: Double = 0
 
     init() {
         super.init(frame: .zero)
@@ -364,8 +423,11 @@ final class SpinningLayerView: NSView {
             // A new cover cross-fades in (Core Animation's implicit fade on contents).
             disc.contents = image
         }
-        guard spinning != isSpinning else { return }
+        // A new speed restarts the spin from wherever the record is, like a turntable's
+        // speed switch.
+        guard spinning != isSpinning || (spinning && degreesPerSecond != self.degreesPerSecond) else { return }
         isSpinning = spinning
+        self.degreesPerSecond = degreesPerSecond
         let current = (disc.presentation() ?? disc).value(forKeyPath: "transform.rotation.z") as? CGFloat ?? 0
         CATransaction.begin()
         CATransaction.setDisableActions(true)

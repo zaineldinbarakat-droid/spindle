@@ -39,19 +39,56 @@ final class SpotifyProvider: MusicProvider {
     end tell
     """
 
+    /// Between songs only the state and position change: just those and the track's ID,
+    /// three Apple Events instead of nine (each one wakes Spotify too).
+    private let quickScript = """
+    set sep to character id 31
+    tell application id "com.spotify.client"
+        set stateText to (player state as text)
+        set positionText to "0"
+        try
+            set positionText to (player position as text)
+        end try
+        set idText to ""
+        try
+            set idText to ((id of current track) as text)
+        end try
+        return stateText & sep & positionText & sep & idText
+    end tell
+    """
+
+    /// The last full snapshot's fields, reused while the same track plays. Guarded by `lock`.
+    nonisolated(unsafe) private var lastFull: [String]?
+    private let lock = NSLock()
+
     func snapshot() throws -> PlaybackSnapshot {
         guard isRunning else { throw PlayerError.notRunning(.spotify) }
-        let descriptor: NSAppleEventDescriptor
+        lock.lock()
+        defer { lock.unlock() }
+
+        let quick = try fields(quickScript, key: "spotify.quick")
+        if quick.count >= 3, !quick[2].isEmpty, var f = lastFull, f[7] == quick[2] {
+            f[0] = quick[0]
+            f[1] = quick[1]
+            return snapshot(from: f)
+        }
+
+        let f = try fields(snapshotScript, key: "spotify.snapshot")
+        guard f.count >= 8 else { throw PlayerError.scriptFailed("Unexpected Spotify response.") }
+        lastFull = f[7].isEmpty ? nil : f
+        return snapshot(from: f)
+    }
+
+    private func fields(_ script: String, key: String) throws -> [String] {
         do {
-            descriptor = try bridge.run(snapshotScript, cacheKey: "spotify.snapshot")
+            return try bridge.run(script, cacheKey: key).fields(separatedBy: scriptFieldSeparator)
         } catch {
             throw AppleScriptBridge.classify(error, provider: .spotify)
         }
+    }
 
-        let f = descriptor.fields(separatedBy: scriptFieldSeparator)
-        guard f.count >= 8 else { throw PlayerError.scriptFailed("Unexpected Spotify response.") }
-
-        return PlaybackSnapshot(
+    private func snapshot(from f: [String]) -> PlaybackSnapshot {
+        PlaybackSnapshot(
             provider: .spotify,
             trackID: f[7],
             title: f[2],

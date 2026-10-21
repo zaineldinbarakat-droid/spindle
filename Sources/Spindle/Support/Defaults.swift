@@ -32,6 +32,9 @@ enum Defaults {
         // Record
         case showsSpindlePin
         case recordLabelSize
+        case recordRPM
+        case labelSpins
+        case showsSpin
 
         // Focus timer
         case focusMinutes

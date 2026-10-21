@@ -37,6 +37,25 @@ final class AudioLevels {
     private var subscribers: [UUID: ([Float], Float) -> Void] = [:]
     private var ticker: Timer?
     private var tap: AnyObject?
+    private var screensAsleep = false
+
+    private init() {
+        // Nobody sees the waves with the display asleep (music often plays on like that):
+        // stop listening and drawing until it wakes. Subscribers stay subscribed.
+        let center = NSWorkspace.shared.notificationCenter
+        center.addObserver(forName: NSWorkspace.screensDidSleepNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.screensAsleep = true
+                self?.update()
+            }
+        }
+        center.addObserver(forName: NSWorkspace.screensDidWakeNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.screensAsleep = false
+                self?.update()
+            }
+        }
+    }
 
     /// Calls `handler` about 30 times a second with fresh levels (bands, punch) while
     /// it's subscribed.
@@ -54,9 +73,9 @@ final class AudioLevels {
     }
 
     /// Runs exactly while something is watching: views subscribe only while music
-    /// plays and "React to the music" is on.
+    /// plays and "React to the music" is on, and the display has to be awake.
     private func update() {
-        let run = !subscribers.isEmpty
+        let run = !subscribers.isEmpty && !screensAsleep
         if run && tap == nil { start() }
         if !run && tap != nil { stop() }
     }

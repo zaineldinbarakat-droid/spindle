@@ -17,6 +17,9 @@ struct SettingsView: View {
     @AppStorage(Defaults.Key.fullScreenTimer.rawValue) private var fullScreenTimer = true
     @AppStorage(Defaults.Key.showsSpindlePin.rawValue) private var showsPin = true
     @AppStorage(Defaults.Key.recordLabelSize.rawValue) private var labelSize = Double(Theme.Record.labelFraction)
+    @AppStorage(Defaults.Key.recordRPM.rawValue) private var recordRPM = Theme.Record.rpm
+    @AppStorage(Defaults.Key.labelSpins.rawValue) private var labelSpins = true
+    @AppStorage(Defaults.Key.showsSpin.rawValue) private var showsSpin = false
 
     var body: some View {
         ZStack {
@@ -64,7 +67,8 @@ struct SettingsView: View {
             return "\(notch.currentPreset?.name ?? "Custom") · \(notch.motion.title) motion"
         case .record:
             guard artworkStyle == .vinyl else { return "Album cover" }
-            return "Vinyl record · art \(Int((labelSize * 100).rounded())) %" + (showsPin ? "" : " · no pin")
+            let speed = Theme.Record.speeds.first { abs($0.rpm - recordRPM) < 0.01 }?.title ?? "33⅓"
+            return "Vinyl record · \(speed) rpm · art \(Int((labelSize * 100).rounded())) %" + (showsPin ? "" : " · no pin")
         case .waves:
             guard notch.showVisualizer || notch.panelWaves else { return "Off" }
             return "\(notch.indicatorStyle.title) · " + (notch.liveWaves ? "react to the music" : "steady rhythm")
@@ -194,8 +198,19 @@ struct SettingsView: View {
             .disabled(artworkStyle != .vinyl)
             Toggle("Spindle pin through the middle of the record", isOn: $showsPin)
                 .disabled(artworkStyle != .vinyl)
+            Picker("Speed", selection: $recordRPM) {
+                ForEach(Theme.Record.speeds, id: \.rpm) { speed in
+                    Text("\(speed.title) rpm").tag(speed.rpm)
+                }
+            }
+            .pickerStyle(.segmented)
+            .disabled(artworkStyle != .vinyl)
+            Toggle("Album art turns with the record", isOn: $labelSpins)
+                .disabled(artworkStyle != .vinyl)
+            Toggle("Show the record turning", isOn: $showsSpin)
+                .disabled(artworkStyle != .vinyl)
         } footer: {
-            Text("Album art sets how much of the record the cover's label fills; the grooves and the tonearm make room for it. Turn the pin off for nothing over the art. Both apply to every record: the notch, the widgets and the turntable wallpaper.")
+            Text("Album art sets how much of the record the cover's label fills; the grooves and the tonearm make room for it. With the art held still, the record turns underneath it. A real record's grooves look still as they turn, so Show the record turning adds the faint, uneven sheen and dust that give the spin away. Everything here applies to every record: the notch, the widgets and the turntable wallpaper.")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }

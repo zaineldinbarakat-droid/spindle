@@ -23,7 +23,9 @@ struct TonearmGeometry {
         self.center = center
         self.radius = radius
         self.labelFraction = labelFraction
-        self.pivot = CGPoint(x: center.x + radius * 1.10, y: center.y - radius * 0.92)
+        // A touch below the record's top edge, so the counterweight stays clear of the
+        // MacBook's notch when the panel is open.
+        self.pivot = CGPoint(x: center.x + radius * 1.10, y: center.y - radius * 0.82)
         self.length = radius * 1.50
     }
 

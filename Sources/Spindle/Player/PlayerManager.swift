@@ -39,6 +39,7 @@ final class PlayerManager: ObservableObject {
     private var activeProviderID: ProviderID = .appleMusic
     private var pollTimer: Timer?
     private var isStarted = false
+    private var screensAsleep = false
     private var observers: [NSObjectProtocol] = []
 
     /// Wall-clock reference for interpolating the playhead between polls.
@@ -68,7 +69,9 @@ final class PlayerManager: ObservableObject {
     /// playing song matters; a paused or stopped player only needs an occasional look.
     private func schedulePoll() {
         pollTimer?.invalidate()
-        guard isStarted else { return }
+        // With the display asleep there's no playhead to keep in sync: the players'
+        // own change notifications still come in, and waking re-syncs at once.
+        guard isStarted, !screensAsleep else { return }
         let interval: TimeInterval = snapshot.isPlaying ? 3 : 10
         pollTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: false) { [weak self] _ in
             Task { @MainActor in self?.refresh() }
@@ -104,6 +107,20 @@ final class PlayerManager: ObservableObject {
                     self?.refreshAvailability()
                     self?.refresh()
                 }
+            }
+        }
+
+        // No polling while the display sleeps (see `schedulePoll`); catch up on waking.
+        center.addObserver(forName: NSWorkspace.screensDidSleepNotification, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in
+                self?.screensAsleep = true
+                self?.pollTimer?.invalidate()
+            }
+        }
+        center.addObserver(forName: NSWorkspace.screensDidWakeNotification, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in
+                self?.screensAsleep = false
+                self?.refresh()
             }
         }
     }
