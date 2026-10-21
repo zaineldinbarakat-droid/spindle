@@ -4,16 +4,25 @@ import SwiftUI
 /// line up with where the record actually is.
 struct TurntableView: View {
     @EnvironmentObject private var player: PlayerManager
+    @AppStorage(Defaults.Key.recordLabelSize.rawValue) private var labelSize = Double(Theme.Record.labelFraction)
 
     var diameter: CGFloat
+
+    /// The deck's frame, as multiples of the record's diameter. The record is centred
+    /// top to bottom with just enough room for the platter's rim, so whoever lays the
+    /// deck out centres the record itself — not a box with empty space under it. The
+    /// width leaves room for the arm's pivot to the right. Only the arm's counterweight
+    /// reaches above the frame, so don't clip the deck vertically.
+    static let widthFactor: CGFloat = 1.55
+    static let heightFactor: CGFloat = 1.10
 
     private let space = "turntable"
 
     var body: some View {
         ZStack {
             let radius = diameter / 2
-            let center = CGPoint(x: diameter / 2, y: diameter / 2)
-            let geo = TonearmGeometry(center: center, radius: radius)
+            let center = CGPoint(x: diameter * 0.53, y: diameter * Self.heightFactor / 2)
+            let geo = TonearmGeometry(center: center, radius: radius, labelFraction: CGFloat(labelSize))
 
             platter(radius: radius)
                 .position(center)
@@ -41,19 +50,35 @@ struct TurntableView: View {
                 onScrubEnded: { player.endScrub() }
             )
         }
-        // The arm pivot sits outside the record, so the container has to be wider.
-        .frame(width: diameter * 1.55, height: diameter * 1.18, alignment: .topLeading)
+        .frame(width: diameter * Self.widthFactor, height: diameter * Self.heightFactor, alignment: .topLeading)
         .coordinateSpace(name: space)
     }
 
-    /// Felt mat peeking out from under the record.
+    /// The platter under the record: a dark rubber mat inside a machined aluminium rim
+    /// that just shows round the record's edge, with the record's shadow on it.
     private func platter(radius: CGFloat) -> some View {
-        Circle()
-            .fill(
-                RadialGradient(colors: [Color(white: 0.20), Color(white: 0.10)],
-                               center: .center, startRadius: 0, endRadius: radius * 1.08)
-            )
-            .frame(width: radius * 2.12, height: radius * 2.12)
-            .shadow(color: .black.opacity(0.7), radius: radius * 0.12, y: radius * 0.05)
+        let rim = radius * 2.10
+        return ZStack {
+            Circle()
+                .fill(AngularGradient(colors: [Color(white: 0.46), Color(white: 0.20), Color(white: 0.38),
+                                               Color(white: 0.16), Color(white: 0.42), Color(white: 0.22),
+                                               Color(white: 0.46)],
+                                      center: .center))
+            Circle()
+                .strokeBorder(LinearGradient(colors: [.white.opacity(0.35), .white.opacity(0.04)],
+                                             startPoint: .topLeading, endPoint: .bottomTrailing),
+                              lineWidth: max(radius * 0.008, 0.5))
+            Circle()
+                .fill(Color(white: 0.06))
+                .padding(radius * 0.035)
+            // The record's shadow, falling a touch down and right on the mat.
+            Circle()
+                .fill(Color.black.opacity(0.75))
+                .frame(width: radius * 2.02, height: radius * 2.02)
+                .offset(x: radius * 0.012, y: radius * 0.025)
+                .blur(radius: radius * 0.025)
+        }
+        .frame(width: rim, height: rim)
+        .shadow(color: .black.opacity(0.6), radius: radius * 0.08, y: radius * 0.04)
     }
 }

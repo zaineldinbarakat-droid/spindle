@@ -29,6 +29,10 @@ enum Defaults {
         case askedForAudio
         case coverGlow
 
+        // Record
+        case showsSpindlePin
+        case recordLabelSize
+
         // Focus timer
         case focusMinutes
         case shortBreakMinutes

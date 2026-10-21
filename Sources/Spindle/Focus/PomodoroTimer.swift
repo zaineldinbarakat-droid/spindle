@@ -200,6 +200,35 @@ final class PomodoroTimer: ObservableObject {
         advance(announce: false)
     }
 
+    /// The back button, the way a music player's works: a few seconds into a phase it
+    /// starts that phase over; at its start it goes back to the phase before, undoing
+    /// the session that phase counted. A running timer keeps running.
+    func previous() {
+        let wasRunning = isRunning
+        let before = phase
+        let elapsed = duration(of: phase) - remaining
+        stopTicker()
+        isRunning = false
+        deadline = nil
+        phaseStarted = false
+
+        if elapsed <= 3 {
+            if phase.isBreak {
+                // The break came after a focus session that counted as done.
+                completedSessions = max(completedSessions - 1, 0)
+                phase = .focus
+            } else if completedSessions > 0 {
+                let set = max(sessionsBeforeLongBreak, 1)
+                phase = completedSessions % set == 0 ? .longBreak : .shortBreak
+            }
+        }
+        remaining = duration(of: phase)
+
+        if phase.isBreak { pauseMusicIfNeeded() }
+        if wasRunning { start() }
+        if phase != before { onPhaseChange?(phase) }
+    }
+
     // MARK: - Ticking
 
     private func startTicker() {

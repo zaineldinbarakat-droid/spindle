@@ -33,8 +33,11 @@ enum Theme {
 
     /// Vinyl sizing, expressed as fractions of the record diameter.
     enum Record {
+        /// The label's default diameter as a share of the record's (Settings → Record
+        /// changes it, within `labelFractionRange`).
         static let labelFraction: CGFloat = 0.38
-        static let spindleFraction: CGFloat = 0.035
+        static let labelFractionRange: ClosedRange<Double> = 0.30...0.62
+        static let spindleFraction: CGFloat = 0.04
         static let grooveInnerFraction: CGFloat = 0.42
         static let grooveOuterFraction: CGFloat = 0.97
         static let rpm: Double = 33 + 1.0 / 3.0

@@ -82,16 +82,16 @@ struct BackdropView: View {
     // MARK: - Turntable
 
     private func deck(diameter: CGFloat) -> some View {
-        let width = diameter * 1.55 + diameter * 0.22
+        let width = diameter * TurntableView.widthFactor + diameter * 0.22
         let headroom = diameter * 0.26
-        let height = diameter * 1.18 + diameter * 0.26 + headroom
+        let height = diameter * TurntableView.heightFactor + diameter * 0.26 + headroom
 
         return ZStack(alignment: .topLeading) {
             WalnutPlinth(cornerRadius: diameter * 0.08)
                 .shadow(color: .black.opacity(0.6), radius: diameter * 0.12, y: diameter * 0.06)
 
             TurntableView(diameter: diameter)
-                .frame(width: diameter * 1.55, height: diameter * 1.18)
+                .frame(width: diameter * TurntableView.widthFactor, height: diameter * TurntableView.heightFactor)
                 .padding(diameter * 0.11)
                 .padding(.top, headroom)
                 .allowsHitTesting(isInteractive)

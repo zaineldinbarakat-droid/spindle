@@ -185,6 +185,9 @@ struct FocusControls: View {
 
             PresetMenu()
 
+            IconButton(symbol: "backward.end.fill", help: "Back: restart this phase, or go to the previous one") {
+                timer.previous()
+            }
             IconButton(symbol: "forward.end.fill", help: "Skip to next phase") { timer.skip() }
             IconButton(symbol: "arrow.counterclockwise", help: "Reset") { timer.reset() }
         }

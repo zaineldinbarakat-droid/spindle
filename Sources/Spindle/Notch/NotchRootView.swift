@@ -151,7 +151,9 @@ struct NotchRootView: View {
         .offset(x: -index * size.width + viewModel.swipeOffset / max(scale, 0.1))
         .animation(NotchViewModel.pageSpring, value: viewModel.tab)
         .frame(width: size.width, height: size.height, alignment: .leading)
-        .clipped()
+        // Clipped sideways only, for the swipe. Clipped at the top too, the tonearm's
+        // counterweight (and on big covers the record) got cut off flat under the strip.
+        .mask(Rectangle().padding(.vertical, -size.height))
     }
 
     private var playerBody: some View {

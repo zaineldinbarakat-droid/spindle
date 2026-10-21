@@ -27,6 +27,8 @@ struct TonearmView: View {
 
     private var armLength: CGFloat { geometry.length }
     private var counterweightLength: CGFloat { armLength * 0.34 }
+    /// The thinnest line worth drawing at this size.
+    private var hairline: CGFloat { max(armLength * 0.004, 0.4) }
 
     var body: some View {
         ZStack {
@@ -48,67 +50,127 @@ struct TonearmView: View {
 
     // MARK: - Pieces
 
+    /// Polished chrome across a tube's thickness: dark edges, a hard highlight just
+    /// above the middle where the lamp catches it.
+    private static let chrome = Gradient(stops: [
+        .init(color: Color(white: 0.22), location: 0.00),
+        .init(color: Color(white: 0.95), location: 0.30),
+        .init(color: Color(white: 0.66), location: 0.48),
+        .init(color: Color(white: 0.38), location: 0.80),
+        .init(color: Color(white: 0.16), location: 1.00)
+    ])
+
     /// Laid out in a square centred on the pivot so that rotation needs no anchor maths:
     /// the arm runs along +x, the counterweight along -x.
     private var armAssembly: some View {
         ZStack {
-            // Counterweight stub behind the pivot.
-            Capsule()
-                .fill(LinearGradient(colors: [Color(white: 0.55), Color(white: 0.30)],
-                                     startPoint: .top, endPoint: .bottom))
-                .frame(width: counterweightLength, height: armLength * 0.045)
+            // The stub behind the pivot, and the counterweight on it.
+            tube(length: counterweightLength, thickness: armLength * 0.024)
                 .offset(x: -counterweightLength / 2)
-
-            Circle()
-                .fill(LinearGradient(colors: [Color(white: 0.62), Color(white: 0.28)],
-                                     startPoint: .topLeading, endPoint: .bottomTrailing))
-                .frame(width: armLength * 0.13, height: armLength * 0.13)
-                .offset(x: -counterweightLength)
+            counterweight
+                .offset(x: -counterweightLength * 0.86)
 
             // Main arm tube.
-            Capsule()
-                .fill(LinearGradient(colors: [Color(white: 0.78), Color(white: 0.42), Color(white: 0.62)],
-                                     startPoint: .top, endPoint: .bottom))
-                .frame(width: armLength * 0.90, height: armLength * 0.032)
-                .offset(x: armLength * 0.45)
+            tube(length: armLength * 0.88, thickness: armLength * 0.028)
+                .offset(x: armLength * 0.44)
 
             headshell
                 .offset(x: armLength * 0.93)
         }
         .frame(width: armLength * 2, height: armLength * 2)
-        .shadow(color: .black.opacity(0.55), radius: armLength * 0.03, x: 0, y: armLength * 0.02)
+        .shadow(color: .black.opacity(0.55), radius: armLength * 0.025, x: armLength * 0.008, y: armLength * 0.022)
+    }
+
+    private func tube(length: CGFloat, thickness: CGFloat) -> some View {
+        Capsule()
+            .fill(LinearGradient(gradient: Self.chrome, startPoint: .top, endPoint: .bottom))
+            .frame(width: length, height: thickness)
+    }
+
+    /// A turned steel cylinder with grip rings, its flat face toward the pivot.
+    private var counterweight: some View {
+        let width = armLength * 0.16
+        let height = armLength * 0.115
+        let shape = RoundedRectangle(cornerRadius: height * 0.2, style: .continuous)
+        return ZStack {
+            shape.fill(LinearGradient(gradient: Self.chrome, startPoint: .top, endPoint: .bottom))
+            HStack(spacing: width * 0.1) {
+                ForEach(0..<5, id: \.self) { _ in
+                    Rectangle()
+                        .fill(Color.black.opacity(0.3))
+                        .frame(width: hairline)
+                }
+            }
+            .padding(.vertical, height * 0.06)
+            shape.strokeBorder(Color.black.opacity(0.4), lineWidth: hairline)
+        }
+        .frame(width: width, height: height)
     }
 
     private var headshell: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: armLength * 0.018, style: .continuous)
-                .fill(LinearGradient(colors: [Color(white: 0.30), Color(white: 0.14)],
-                                     startPoint: .top, endPoint: .bottom))
-                .frame(width: armLength * 0.16, height: armLength * 0.075)
+        let shell = RoundedRectangle(cornerRadius: armLength * 0.016, style: .continuous)
+        return ZStack {
+            // Finger lift, angled off the side.
+            Capsule()
+                .fill(LinearGradient(gradient: Self.chrome, startPoint: .top, endPoint: .bottom))
+                .frame(width: armLength * 0.10, height: armLength * 0.014)
+                .rotationEffect(.degrees(-38))
+                .offset(x: armLength * 0.035, y: -armLength * 0.055)
 
-            // Stylus: a small wedge under the leading edge of the headshell.
-            Triangle()
-                .fill(isEngaged ? accent : Color(white: 0.6))
-                .frame(width: armLength * 0.030, height: armLength * 0.045)
-                .offset(x: armLength * 0.062, y: armLength * 0.052)
+            // The shell: black anodised, its edge catching the light.
+            shell
+                .fill(LinearGradient(colors: [Color(white: 0.26), Color(white: 0.08)],
+                                     startPoint: .top, endPoint: .bottom))
+                .frame(width: armLength * 0.17, height: armLength * 0.072)
+            shell
+                .strokeBorder(LinearGradient(colors: [.white.opacity(0.4), .white.opacity(0.06)],
+                                             startPoint: .top, endPoint: .bottom),
+                              lineWidth: hairline)
+                .frame(width: armLength * 0.17, height: armLength * 0.072)
+
+            // The cartridge under the front of the shell — in the song's colour while
+            // it plays — and the diamond at its tip.
+            RoundedRectangle(cornerRadius: armLength * 0.008, style: .continuous)
+                .fill(LinearGradient(colors: isEngaged ? [accent, accent.darkened(0.45)]
+                                                       : [Color(white: 0.5), Color(white: 0.28)],
+                                     startPoint: .top, endPoint: .bottom))
+                .frame(width: armLength * 0.075, height: armLength * 0.046)
+                .offset(x: armLength * 0.035, y: armLength * 0.008)
+            Circle()
+                .fill(Color(white: 0.92))
+                .frame(width: armLength * 0.014, height: armLength * 0.014)
+                .offset(x: armLength * 0.068, y: armLength * 0.03)
         }
         .rotationEffect(.degrees(18))   // classic offset angle of the cartridge
     }
 
+    /// The bearing the arm swings on: a machined base with a domed gimbal cap. It
+    /// doesn't turn with the arm, so it's drawn on top, the arm running out from under it.
     private var pivotHousing: some View {
-        ZStack {
+        let base = armLength * 0.22
+        return ZStack {
             Circle()
-                .fill(RadialGradient(colors: [Color(white: 0.48), Color(white: 0.18)],
-                                     center: .topLeading,
+                .fill(AngularGradient(colors: [Color(white: 0.52), Color(white: 0.24), Color(white: 0.44),
+                                               Color(white: 0.20), Color(white: 0.50), Color(white: 0.26),
+                                               Color(white: 0.52)],
+                                      center: .center))
+            Circle()
+                .strokeBorder(LinearGradient(colors: [.white.opacity(0.5), .black.opacity(0.4)],
+                                             startPoint: .topLeading, endPoint: .bottomTrailing),
+                              lineWidth: hairline * 1.5)
+            Circle()
+                .fill(RadialGradient(colors: [Color(white: 0.92), Color(white: 0.5), Color(white: 0.18)],
+                                     center: UnitPoint(x: 0.35, y: 0.3),
                                      startRadius: 0,
-                                     endRadius: armLength * 0.12))
-                .frame(width: armLength * 0.17, height: armLength * 0.17)
-
+                                     endRadius: base * 0.32))
+                .frame(width: base * 0.56, height: base * 0.56)
+                .shadow(color: .black.opacity(0.5), radius: base * 0.05, y: base * 0.03)
             Circle()
-                .strokeBorder(Color.white.opacity(0.22), lineWidth: 1)
-                .frame(width: armLength * 0.17, height: armLength * 0.17)
+                .fill(Color(white: 0.1))
+                .frame(width: base * 0.11, height: base * 0.11)
         }
-        .shadow(color: .black.opacity(0.5), radius: armLength * 0.02, y: armLength * 0.01)
+        .frame(width: base, height: base)
+        .shadow(color: .black.opacity(0.5), radius: armLength * 0.02, y: armLength * 0.012)
     }
 
     // MARK: - Scrubbing
@@ -142,17 +204,5 @@ struct ArmHitArea: Shape {
                           width: length * 1.46,
                           height: length * 0.160)
         return Capsule().path(in: body)
-    }
-}
-
-/// Stylus wedge.
-struct Triangle: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        path.move(to: CGPoint(x: rect.midX, y: rect.maxY))
-        path.addLine(to: CGPoint(x: rect.minX, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
-        path.closeSubpath()
-        return path
     }
 }

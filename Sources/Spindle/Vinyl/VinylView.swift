@@ -2,11 +2,14 @@ import SwiftUI
 
 /// A spinning 12" record with the cover art pressed into the centre label.
 ///
-/// The disc splits into two layers: a static one (base, grooves) that never redraws, and
-/// a rotating one (sheen, label, pressing mark). Concentric grooves look identical under
-/// rotation, so keeping them still costs nothing visually.
+/// Drawn the way a record looks under a lamp: deep black vinyl whose fine grooves catch
+/// the light in two opposed wedges, smooth bands between the tracks, a glossy lead-in
+/// and run-out, and a bevelled rim. The lamp doesn't turn with the record, so neither do
+/// the grooves' highlights: the whole surface is one static layer that never redraws.
+/// Only the label and a small etching in the run-out turn, and a steel spindle sits
+/// still through the middle.
 ///
-/// The rotating part is drawn once into an image and spun by Core Animation: the
+/// The turning part is drawn once into an image and spun by Core Animation: the
 /// window server turns it at the display's own rate (120 Hz on ProMotion) while Spindle
 /// does nothing per frame. It's redrawn only when the cover, colour or size changes.
 struct VinylView: View {
@@ -17,14 +20,21 @@ struct VinylView: View {
 
     @State private var rotatingImage: CGImage?
     @Environment(\.displayScale) private var displayScale
+    /// Settings → Record. AppStorage, so every record (notch, widgets, wallpaper) follows.
+    @AppStorage(Defaults.Key.showsSpindlePin.rawValue) private var showsPin = true
+    @AppStorage(Defaults.Key.recordLabelSize.rawValue) private var labelSize = Double(Theme.Record.labelFraction)
 
     private var degreesPerSecond: Double { rpm * 6 }
+    private var labelFraction: CGFloat {
+        CGFloat(min(max(labelSize, Theme.Record.labelFractionRange.lowerBound), Theme.Record.labelFractionRange.upperBound))
+    }
 
     private struct RenderKey: Equatable {
         var size: CGFloat
         var artwork: ObjectIdentifier?
         var accent: Color
         var scale: CGFloat
+        var labelFraction: CGFloat
     }
 
     var body: some View {
@@ -32,14 +42,21 @@ struct VinylView: View {
             let size = min(geo.size.width, geo.size.height)
 
             ZStack {
-                staticDisc(size: size)
+                VinylSurface(labelFraction: labelFraction)
+                    .frame(width: size, height: size)
+                    .drawingGroup()
                 SpinningLayer(image: rotatingImage, isSpinning: isSpinning, degreesPerSecond: degreesPerSecond)
                     .frame(width: size, height: size)
+                if showsPin {
+                    spindle(size: size)
+                        .transition(.opacity)
+                }
             }
+            .animation(.easeOut(duration: 0.2), value: showsPin)
             .frame(width: size, height: size)
             .frame(width: geo.size.width, height: geo.size.height)
             .task(id: RenderKey(size: size, artwork: artwork.map(ObjectIdentifier.init),
-                                accent: accent, scale: displayScale)) {
+                                accent: accent, scale: displayScale, labelFraction: labelFraction)) {
                 guard size > 0 else { return }
                 let renderer = ImageRenderer(content: rotatingDisc(size: size))
                 renderer.scale = displayScale
@@ -48,71 +65,32 @@ struct VinylView: View {
         }
     }
 
-    // MARK: - Layers
-
-    private func staticDisc(size: CGFloat) -> some View {
-        ZStack {
-            Circle()
-                .fill(
-                    RadialGradient(
-                        colors: [Color(white: 0.16), Color(white: 0.07), Color(white: 0.03)],
-                        center: .center,
-                        startRadius: size * 0.1,
-                        endRadius: size * 0.5
-                    )
-                )
-
-            GrooveCanvas(accent: accent)
-
-            // Lip at the very edge where the pressing thickens.
-            Circle()
-                .strokeBorder(Color.white.opacity(0.10), lineWidth: max(size * 0.006, 0.5))
-        }
-        .frame(width: size, height: size)
-        .drawingGroup()
-    }
+    // MARK: - The turning part
 
     private func rotatingDisc(size: CGFloat) -> some View {
         ZStack {
-            sheen(size: size)
-            pressingMark(size: size)
+            matrixEtching(size: size)
             label(size: size)
-            spindleHole(size: size)
         }
         .frame(width: size, height: size)
     }
 
-    /// Two opposed highlights sweeping the disc — what sells it as a glossy surface.
-    private func sheen(size: CGFloat) -> some View {
-        Circle()
-            .fill(
-                AngularGradient(
-                    gradient: Gradient(stops: [
-                        .init(color: .white.opacity(0.00), location: 0.00),
-                        .init(color: .white.opacity(0.11), location: 0.10),
-                        .init(color: .white.opacity(0.00), location: 0.22),
-                        .init(color: .white.opacity(0.00), location: 0.48),
-                        .init(color: .white.opacity(0.09), location: 0.60),
-                        .init(color: .white.opacity(0.00), location: 0.72),
-                        .init(color: .white.opacity(0.00), location: 1.00)
-                    ]),
-                    center: .center
-                )
-            )
-            .blendMode(.screen)
-            .frame(width: size, height: size)
-    }
-
-    private func pressingMark(size: CGFloat) -> some View {
-        Rectangle()
-            .fill(Color.white.opacity(0.05))
-            .frame(width: max(size * 0.0035, 0.5),
-                   height: size * (Theme.Record.grooveOuterFraction - Theme.Record.grooveInnerFraction) / 2)
-            .offset(y: -size * (Theme.Record.grooveOuterFraction + Theme.Record.grooveInnerFraction) / 4)
+    /// The pressing plant's hand-scratched mark in the run-out: a short arc that shows
+    /// the record turning even though its grooves look the same at every angle.
+    private func matrixEtching(size: CGFloat) -> some View {
+        let zones = VinylZones(radius: size / 2, labelFraction: labelFraction)
+        let radius = (zones.labelEdge + zones.runOut) / 2
+        return Path { path in
+            path.addArc(center: CGPoint(x: size / 2, y: size / 2), radius: radius,
+                        startAngle: .degrees(-118), endAngle: .degrees(-62), clockwise: false)
+        }
+        .stroke(Color.white.opacity(0.16), style: StrokeStyle(lineWidth: max(size * 0.004, 0.4),
+                                                              lineCap: .round, dash: [size * 0.012, size * 0.006]))
+        .frame(width: size, height: size)
     }
 
     private func label(size: CGFloat) -> some View {
-        let labelSize = size * Theme.Record.labelFraction
+        let labelSize = size * labelFraction
 
         return ZStack {
             Circle()
@@ -124,67 +102,222 @@ struct VinylView: View {
             if let artwork {
                 Image(nsImage: artwork)
                     .resizable()
+                    .interpolation(.high)
                     .aspectRatio(contentMode: .fill)
                     .frame(width: labelSize, height: labelSize)
                     .clipShape(Circle())
                     .transition(.opacity)
             }
 
-            // Paper texture ring so the art reads as a printed label, not a sticker.
-            Circle()
-                .strokeBorder(Color.black.opacity(0.35), lineWidth: labelSize * 0.03)
-
+            // Printed paper, not a sticker: a soft falloff toward the edge, the faint ring
+            // labels are printed with, and the dark seam where the vinyl was pressed on.
             Circle()
                 .fill(
-                    RadialGradient(colors: [.clear, .black.opacity(0.35)],
+                    RadialGradient(colors: [.clear, .black.opacity(0.32)],
                                    center: .center,
-                                   startRadius: labelSize * 0.25,
+                                   startRadius: labelSize * 0.28,
                                    endRadius: labelSize * 0.52)
                 )
+            Circle()
+                .strokeBorder(Color.white.opacity(0.10), lineWidth: max(labelSize * 0.006, 0.3))
+                .padding(labelSize * 0.07)
+            Circle()
+                .strokeBorder(Color.black.opacity(0.55), lineWidth: max(labelSize * 0.022, 0.5))
         }
         .frame(width: labelSize, height: labelSize)
         .animation(.easeOut(duration: 0.35), value: artwork)
     }
 
-    private func spindleHole(size: CGFloat) -> some View {
-        let hole = size * Theme.Record.spindleFraction
-        return Circle()
-            .fill(Color(white: 0.05))
-            .overlay(Circle().strokeBorder(Color.black.opacity(0.8), lineWidth: 0.5))
-            .frame(width: hole, height: hole)
-            .shadow(color: .black.opacity(0.6), radius: hole * 0.2)
+    // MARK: - Still parts on top
+
+    /// The turntable's steel spindle through the label hole: it doesn't turn with the
+    /// record, so its highlight stays put.
+    private func spindle(size: CGFloat) -> some View {
+        let pin = max(size * Theme.Record.spindleFraction, 1.5)
+        let hairline = max(pin * 0.06, 0.25)
+        return ZStack {
+            // The punched hole round the pin, its far edge catching a little light.
+            Circle()
+                .fill(Color.black.opacity(0.78))
+                .frame(width: pin * 1.5, height: pin * 1.5)
+            Circle()
+                .strokeBorder(LinearGradient(colors: [.black.opacity(0.6), .white.opacity(0.22)],
+                                             startPoint: .topLeading, endPoint: .bottomTrailing),
+                              lineWidth: hairline * 1.4)
+                .frame(width: pin * 1.5, height: pin * 1.5)
+            // Turned steel: faint rings from the lathe, a domed top lit from the upper
+            // left, and a crisp edge.
+            Circle()
+                .fill(AngularGradient(colors: [Color(white: 0.84), Color(white: 0.48), Color(white: 0.72),
+                                               Color(white: 0.42), Color(white: 0.84)],
+                                      center: .center))
+                .frame(width: pin, height: pin)
+            Circle()
+                .fill(RadialGradient(colors: [.white.opacity(0.95), .white.opacity(0)],
+                                     center: UnitPoint(x: 0.34, y: 0.3),
+                                     startRadius: 0,
+                                     endRadius: pin * 0.45))
+                .frame(width: pin, height: pin)
+            Circle()
+                .strokeBorder(Color.black.opacity(0.5), lineWidth: hairline)
+                .frame(width: pin, height: pin)
+        }
+        .shadow(color: .black.opacity(0.6), radius: pin * 0.16, x: pin * 0.06, y: pin * 0.1)
+        .allowsHitTesting(false)
     }
 }
 
-/// Concentric grooves, plus the wider spacing of the lead-in and run-out bands.
-private struct GrooveCanvas: View {
-    var accent: Color
+/// The record's surface, lit from the upper left: everything on a record that doesn't
+/// turn visibly when it plays.
+private struct VinylSurface: View {
+    var labelFraction: CGFloat
 
     var body: some View {
-        Canvas { context, size in
-            let dimension = min(size.width, size.height)
-            let center = CGPoint(x: size.width / 2, y: size.height / 2)
-            let outer = dimension / 2 * Theme.Record.grooveOuterFraction
-            let inner = dimension / 2 * Theme.Record.grooveInnerFraction
+        Canvas { context, canvas in
+            let size = min(canvas.width, canvas.height)
+            let center = CGPoint(x: canvas.width / 2, y: canvas.height / 2)
+            let radius = size / 2
+            let zones = VinylZones(radius: radius, labelFraction: labelFraction)
 
-            let count = max(Int(dimension / 3.0), 24)
-            let lineWidth = max(dimension * 0.0022, 0.35)
-
-            for index in 0..<count {
-                let t = Double(index) / Double(count - 1)
-                let radius = outer - (outer - inner) * t
-
-                // Lead-in and run-out grooves are cut coarser than the audio band.
-                let isBand = t < 0.06 || t > 0.94
-                let opacity = isBand ? 0.20 : 0.055 + 0.045 * sin(t * .pi * 9)
-
-                let rect = CGRect(x: center.x - radius, y: center.y - radius,
-                                  width: radius * 2, height: radius * 2)
-                context.stroke(Path(ellipseIn: rect),
-                               with: .color(.white.opacity(opacity)),
-                               lineWidth: isBand ? lineWidth * 1.6 : lineWidth)
+            func circle(_ r: CGFloat) -> Path {
+                Path(ellipseIn: CGRect(x: center.x - r, y: center.y - r, width: r * 2, height: r * 2))
             }
+            func band(_ inner: CGFloat, _ outer: CGFloat) -> Path {
+                var path = circle(outer)
+                path.addPath(circle(inner))
+                return path
+            }
+            let eoFill = FillStyle(eoFill: true)
+            let disc = circle(radius)
+
+            // The vinyl: black, a breath lighter toward the middle where it's thickest.
+            context.fill(disc, with: .radialGradient(
+                Gradient(colors: [Color(white: 0.085), Color(white: 0.05), Color(white: 0.032)]),
+                center: center, startRadius: 0, endRadius: radius))
+
+            // Grooves: a fine, uneven texture, the way the cut varies with the music.
+            let grooves = zones.grooves(size: size)
+            let hairline = max(size * 0.0018, 0.3)
+            for groove in grooves {
+                context.stroke(circle(groove.radius),
+                               with: .color(.white.opacity(groove.texture)),
+                               lineWidth: groove.isLeadIn ? hairline * 1.8 : hairline)
+            }
+
+            // The smooth bands — between tracks, the run-out, the rim — are glossier
+            // and a touch darker than the grooved vinyl around them.
+            for gap in zones.trackGaps {
+                context.fill(band(gap.lowerBound, gap.upperBound), with: .color(.black.opacity(0.55)), style: eoFill)
+                context.stroke(circle(gap.upperBound), with: .color(.white.opacity(0.07)), lineWidth: hairline)
+            }
+            context.fill(band(zones.labelEdge, zones.runOut), with: .color(.black.opacity(0.35)), style: eoFill)
+            for locked in zones.lockedGrooves {
+                context.stroke(circle(locked), with: .color(.white.opacity(0.10)), lineWidth: hairline)
+            }
+
+            // The lamp: two opposed wedges of light that only the grooves pick up, as
+            // streaks along them. Brighter toward the light (upper left).
+            let light = Gradient(stops: [
+                .init(color: .white.opacity(1.00), location: 0.000),
+                .init(color: .white.opacity(0.42), location: 0.025),
+                .init(color: .white.opacity(0.00), location: 0.080),
+                .init(color: .white.opacity(0.00), location: 0.420),
+                .init(color: .white.opacity(0.24), location: 0.475),
+                .init(color: .white.opacity(0.62), location: 0.500),
+                .init(color: .white.opacity(0.24), location: 0.525),
+                .init(color: .white.opacity(0.00), location: 0.580),
+                .init(color: .white.opacity(0.00), location: 0.920),
+                .init(color: .white.opacity(0.42), location: 0.975),
+                .init(color: .white.opacity(1.00), location: 1.000)
+            ])
+            let lampAngle = Angle.degrees(225) // pointing up and to the left, on screen
+            context.drawLayer { layer in
+                for groove in grooves {
+                    layer.stroke(circle(groove.radius), with: .color(.white.opacity(0.55 + groove.texture * 4)),
+                                 lineWidth: hairline * 1.2)
+                }
+                layer.blendMode = .sourceIn
+                layer.fill(disc, with: .conicGradient(light, center: center, angle: lampAngle))
+            }
+
+            // The gloss on top: the same light as a broad, soft sheen over the whole disc.
+            let gloss = Gradient(stops: [
+                .init(color: .white.opacity(0.09), location: 0.00),
+                .init(color: .white.opacity(0.00), location: 0.12),
+                .init(color: .white.opacity(0.00), location: 0.38),
+                .init(color: .white.opacity(0.05), location: 0.50),
+                .init(color: .white.opacity(0.00), location: 0.62),
+                .init(color: .white.opacity(0.00), location: 0.88),
+                .init(color: .white.opacity(0.09), location: 1.00)
+            ])
+            context.fill(disc, with: .conicGradient(gloss, center: center, angle: lampAngle))
+
+            // The rim: rounded over, so it catches the light on the lamp's side and
+            // falls into shadow on the other.
+            let bevel = max(size * 0.009, 0.6)
+            context.stroke(circle(radius - bevel / 2),
+                           with: .linearGradient(Gradient(colors: [.white.opacity(0.30), .white.opacity(0.03)]),
+                                                 startPoint: CGPoint(x: center.x - radius, y: center.y - radius),
+                                                 endPoint: CGPoint(x: center.x + radius, y: center.y + radius)),
+                           lineWidth: bevel)
+            context.stroke(circle(radius - bevel * 1.5), with: .color(.black.opacity(0.6)), lineWidth: bevel * 0.6)
         }
+    }
+}
+
+/// Where everything sits on the record, as radii.
+private struct VinylZones {
+    var radius: CGFloat
+    /// The label's diameter as a share of the record's.
+    var labelFraction: CGFloat
+
+    struct Groove {
+        var radius: CGFloat
+        /// How much this groove catches stray light, 0...~0.07: the texture of the cut.
+        var texture: Double
+        var isLeadIn: Bool
+    }
+
+    var labelEdge: CGFloat { radius * labelFraction }
+    /// Where the music ends and the smooth run-out begins: just past the label, so a
+    /// bigger label pushes the grooves out rather than covering them.
+    var runOut: CGFloat { radius * max(Theme.Record.grooveInnerFraction, labelFraction + 0.045) }
+    /// Where the music starts, inside the coarser lead-in.
+    var leadIn: CGFloat { radius * (Theme.Record.grooveOuterFraction - 0.03) }
+    var outerGroove: CGFloat { radius * Theme.Record.grooveOuterFraction }
+
+    /// The silent bands between tracks, at fixed spots so every record looks pressed
+    /// from the same master.
+    var trackGaps: [ClosedRange<CGFloat>] {
+        let width = radius * 0.009
+        return [0.14, 0.31, 0.49, 0.64, 0.81].map { t in
+            let r = runOut + (leadIn - runOut) * t
+            return (r - width / 2)...(r + width / 2)
+        }
+    }
+
+    /// The locked groove and its neighbour, where the stylus ends up circling.
+    var lockedGrooves: [CGFloat] {
+        [runOut - radius * 0.008, labelEdge + radius * 0.012]
+    }
+
+    func grooves(size: CGFloat) -> [Groove] {
+        let pitch = max(size * 0.0042, 0.55)
+        let gaps = trackGaps
+        var result: [Groove] = []
+        var r = runOut
+        var index = 0
+        while r < outerGroove {
+            defer { r += r > leadIn ? pitch * 2.6 : pitch; index += 1 }
+            if gaps.contains(where: { $0.contains(r) }) { continue }
+            // A cheap, repeatable "random" texture: loud passages cut wider grooves.
+            let wobble = (sin(Double(index) * 12.9898) * 43758.5453).truncatingRemainder(dividingBy: 1)
+            let swell = 0.5 + 0.5 * sin(Double(r / radius) * 41)
+            result.append(Groove(radius: r,
+                                 texture: 0.022 + 0.03 * abs(wobble) + 0.018 * swell,
+                                 isLeadIn: r > leadIn))
+        }
+        return result
     }
 }
 

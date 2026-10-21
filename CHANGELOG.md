@@ -2,6 +2,15 @@
 
 All notable changes to Spindle.
 
+## 0.6.6 — A real record, cleaner Settings
+- **A record that looks real:** the light no longer spins with the disc. Two fixed highlights run along the fine grooves the way a lamp catches real vinyl, with smooth bands between tracks, a glossy lead-in and run-out, a bevelled rim and a brushed-metal platter under it.
+- **No more cut-off record:** the record and tonearm sat a little too high in the open notch and were clipped flat under the strip beside the camera. They now sit fully in view.
+- **A finer tonearm and pin:** a polished chrome arm, a ribbed steel counterweight, a machined bearing with a domed cap, a black headshell whose cartridge takes the song's colour, and a turned-steel spindle pin.
+- **Album art size:** Settings → Record sets how much of the record the cover's label fills; the grooves and the tonearm make room for it.
+- **Spindle pin on or off:** Settings → Record turns the steel pin through the label off, for nothing over the album art.
+- **Cleaner Settings:** it opens on a short list of categories, each with its current state; click one to edit just that.
+- **Back button on the timer:** restarts the phase you're in, or a second press goes back to the one before.
+
 ## 0.6.5 — Crisper waves, macOS motion
 - **Crisper, smoother waves:** bars sit on whole pixels (fractional positions blurred their edges), the glow is tighter, and live levels glide from frame to frame instead of stepping.
 - **React to the music is on by default**, and Spindle asks for the audio permission when it first starts — not in the middle of a song.

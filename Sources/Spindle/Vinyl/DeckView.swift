@@ -36,7 +36,7 @@ struct DeckView: View {
             switch style {
             case .vinyl:
                 TurntableView(diameter: size)
-                    .frame(width: size * 1.55, height: size * 1.18)
+                    .frame(width: size * TurntableView.widthFactor, height: size * TurntableView.heightFactor)
             case .cover:
                 CoverArtView(size: size, glow: glow)
                     .frame(width: size, height: size)

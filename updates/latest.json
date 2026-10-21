@@ -1,5 +1,5 @@
 {
-  "version": "0.6.5",
-  "notes": "Crisper, smoother waves. React to the music is on by default (Spindle asks for the audio permission at first start). New macOS motion: the notch opens like any macOS pop-up.",
+  "version": "0.6.6",
+  "notes": "A record that looks real, with a finer tonearm and spindle pin, and no more cut-off record in the open notch. Settings → Record sets the album art's size and turns the pin off. Settings opens on a short list of categories. The timer has a back button.",
   "minimumSystemVersion": "14.0"
 }

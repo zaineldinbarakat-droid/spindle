@@ -16,18 +16,22 @@ struct TonearmGeometry {
     var length: CGFloat
     /// Arm pivot, up and to the right of the platter.
     var pivot: CGPoint
+    /// The label's diameter as a share of the record's: the arm stops short of it.
+    var labelFraction: CGFloat
 
-    init(center: CGPoint, radius: CGFloat) {
+    init(center: CGPoint, radius: CGFloat, labelFraction: CGFloat = Theme.Record.labelFraction) {
         self.center = center
         self.radius = radius
+        self.labelFraction = labelFraction
         self.pivot = CGPoint(x: center.x + radius * 1.10, y: center.y - radius * 0.92)
         self.length = radius * 1.50
     }
 
     /// Groove radius at progress 0 — the lead-in, just inside the edge.
     var outerGroove: CGFloat { radius * 0.93 }
-    /// Groove radius at progress 1 — the run-out, at the label edge.
-    var innerGroove: CGFloat { radius * 0.45 }
+    /// Groove radius at progress 1 — the run-out, at the label edge (further out when
+    /// the label is bigger).
+    var innerGroove: CGFloat { radius * max(0.45, labelFraction + 0.07) }
     /// Where the arm parks when nothing is playing: clear of the record.
     var restGroove: CGFloat { radius * 1.25 }
 
