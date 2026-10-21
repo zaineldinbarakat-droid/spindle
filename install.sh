@@ -12,5 +12,7 @@ pkill -x Spindle 2>/dev/null || true
 
 rm -rf "/Applications/Spindle.app"
 /usr/bin/ditto "$ROOT/build/Spindle.app" "/Applications/Spindle.app"
+# Otherwise Spotlight finds two Spindles: this one and the build copy.
+rm -rf "$ROOT/build/Spindle.app"
 echo "Installed /Applications/Spindle.app"
 open "/Applications/Spindle.app"

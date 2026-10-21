@@ -20,6 +20,8 @@ for app in Spindle; do
     rm -f "$ROOT/updates/$app.zip"
     # ditto keeps the bundle's signature, symlinks and attributes intact.
     /usr/bin/ditto -c -k --keepParent "$ROOT/build/$app.app" "$ROOT/updates/$app.zip"
+    # Only the zip is needed from here; a loose copy would show up in Spotlight.
+    rm -rf "$ROOT/build/$app.app"
     echo "Packed updates/$app.zip ($(du -h "$ROOT/updates/$app.zip" | cut -f1))"
 done
 
