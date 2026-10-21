@@ -35,12 +35,14 @@ enum Theme {
     enum Record {
         /// The label's default diameter as a share of the record's (Settings → Record
         /// changes it, within `labelFractionRange`).
-        static let labelFraction: CGFloat = 0.38
+        static let labelFraction: CGFloat = 0.52
         static let labelFractionRange: ClosedRange<Double> = 0.30...0.62
         static let spindleFraction: CGFloat = 0.04
         static let grooveInnerFraction: CGFloat = 0.42
         static let grooveOuterFraction: CGFloat = 0.97
-        static let rpm: Double = 33 + 1.0 / 3.0
+        /// The default speed: a slow, easy 16⅔ (Settings → Record offers the others).
+        /// Spelled exactly as in `speeds`, so the picker recognises it.
+        static let rpm: Double = 16 + 2.0 / 3.0
         /// The speeds a turntable offers, for Settings → Record.
         static let speeds: [(rpm: Double, title: String)] = [
             (8 + 1.0 / 3.0, "8⅓"), (16 + 2.0 / 3.0, "16⅔"), (33 + 1.0 / 3.0, "33⅓"), (45, "45"), (78, "78")

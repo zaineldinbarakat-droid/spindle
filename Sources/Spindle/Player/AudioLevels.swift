@@ -20,7 +20,7 @@ final class AudioLevels {
     /// A loud hit right now — a drum, a drop — from 0 (steady) to 1, for a flash of glow.
     private(set) var punch: Float = 0
     /// 0 (calm) … 1 (wild): how much loud moments and high notes are exaggerated.
-    var intensity: Float = Float(Defaults.double(.waveIntensity, default: 0.6))
+    var intensity: Float = Float(Defaults.double(.waveIntensity, default: 0.53))
 
     // Each band's recent range, so every song — quiet or loud, bass-heavy or bright —
     // fills the bars, and what stands out is what's changing.

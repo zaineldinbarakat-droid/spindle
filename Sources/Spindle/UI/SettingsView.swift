@@ -15,11 +15,11 @@ struct SettingsView: View {
     @State private var sizePreview = 0
     @AppStorage(ArtworkStyle.storageKey) private var artworkStyle: ArtworkStyle = .vinyl
     @AppStorage(Defaults.Key.fullScreenTimer.rawValue) private var fullScreenTimer = true
-    @AppStorage(Defaults.Key.showsSpindlePin.rawValue) private var showsPin = true
+    @AppStorage(Defaults.Key.showsSpindlePin.rawValue) private var showsPin = false
     @AppStorage(Defaults.Key.recordLabelSize.rawValue) private var labelSize = Double(Theme.Record.labelFraction)
     @AppStorage(Defaults.Key.recordRPM.rawValue) private var recordRPM = Theme.Record.rpm
     @AppStorage(Defaults.Key.labelSpins.rawValue) private var labelSpins = true
-    @AppStorage(Defaults.Key.showsSpin.rawValue) private var showsSpin = false
+    @AppStorage(Defaults.Key.showsSpin.rawValue) private var showsSpin = true
 
     var body: some View {
         ZStack {
@@ -67,7 +67,8 @@ struct SettingsView: View {
             return "\(notch.currentPreset?.name ?? "Custom") · \(notch.motion.title) motion"
         case .record:
             guard artworkStyle == .vinyl else { return "Album cover" }
-            let speed = Theme.Record.speeds.first { abs($0.rpm - recordRPM) < 0.01 }?.title ?? "33⅓"
+            let speed = Theme.Record.speeds.first { abs($0.rpm - recordRPM) < 0.01 }?.title
+                ?? String(format: "%g", recordRPM)
             return "Vinyl record · \(speed) rpm · art \(Int((labelSize * 100).rounded())) %" + (showsPin ? "" : " · no pin")
         case .waves:
             guard notch.showVisualizer || notch.panelWaves else { return "Off" }

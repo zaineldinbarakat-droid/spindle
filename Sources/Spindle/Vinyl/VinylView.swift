@@ -22,14 +22,14 @@ struct VinylView: View {
     @State private var rotatingImage: CGImage?
     @Environment(\.displayScale) private var displayScale
     /// Settings → Record. AppStorage, so every record (notch, widgets, wallpaper) follows.
-    @AppStorage(Defaults.Key.showsSpindlePin.rawValue) private var showsPin = true
+    @AppStorage(Defaults.Key.showsSpindlePin.rawValue) private var showsPin = false
     @AppStorage(Defaults.Key.recordLabelSize.rawValue) private var labelSize = Double(Theme.Record.labelFraction)
     @AppStorage(Defaults.Key.recordRPM.rawValue) private var storedRPM = Theme.Record.rpm
     /// Off: the album art holds still while the record turns under it.
     @AppStorage(Defaults.Key.labelSpins.rawValue) private var labelSpins = true
     /// The lamp's reflection sways once a turn, the way it does on a real (never quite
     /// flat) record, so the spin shows on the vinyl itself: perfect grooves look still.
-    @AppStorage(Defaults.Key.showsSpin.rawValue) private var showsSpin = false
+    @AppStorage(Defaults.Key.showsSpin.rawValue) private var showsSpin = true
 
     private var degreesPerSecond: Double { (rpm ?? storedRPM) * 6 }
     private var labelFraction: CGFloat {

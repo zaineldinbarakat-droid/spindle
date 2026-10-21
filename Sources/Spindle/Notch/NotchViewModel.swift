@@ -179,18 +179,18 @@ final class NotchViewModel: ObservableObject {
     @Published var indicatorStyle: IndicatorStyle = IndicatorStyle(rawValue: Defaults.string(.indicatorStyle) ?? "") ?? .bars {
         didSet { Defaults.set(.indicatorStyle, indicatorStyle.rawValue) }
     }
-    @Published var indicatorColorMode: IndicatorColor = IndicatorColor(rawValue: Defaults.string(.indicatorColorMode) ?? "") ?? .album {
+    @Published var indicatorColorMode: IndicatorColor = IndicatorColor(rawValue: Defaults.string(.indicatorColorMode) ?? "") ?? .white {
         didSet { Defaults.set(.indicatorColorMode, indicatorColorMode.rawValue) }
     }
     @Published var indicatorCustomColor: Color = NotchViewModel.loadColor(Defaults.string(.indicatorCustomColor)) {
         didSet { Defaults.set(.indicatorCustomColor, NotchViewModel.saveColor(indicatorCustomColor)) }
     }
     /// 0.3 (soft) … 1 (bright).
-    @Published var indicatorBrightness: Double = Defaults.double(.indicatorBrightness, default: 0.85) {
+    @Published var indicatorBrightness: Double = Defaults.double(.indicatorBrightness, default: 0.65) {
         didSet { Defaults.set(.indicatorBrightness, indicatorBrightness) }
     }
     /// 0 (no glow) … 1 (strong halo).
-    @Published var indicatorGlow: Double = Defaults.double(.indicatorGlow, default: 0.6) {
+    @Published var indicatorGlow: Double = Defaults.double(.indicatorGlow, default: 0) {
         didSet { Defaults.set(.indicatorGlow, indicatorGlow) }
     }
 
@@ -214,7 +214,7 @@ final class NotchViewModel: ObservableObject {
     }
 
     /// The collapsed notch's left wing: the album cover (default) or the spinning record.
-    @Published var collapsedShowsCover: Bool = Defaults.bool(.collapsedShowsCover, default: true) {
+    @Published var collapsedShowsCover: Bool = Defaults.bool(.collapsedShowsCover, default: false) {
         didSet { Defaults.set(.collapsedShowsCover, collapsedShowsCover) }
     }
 
@@ -232,7 +232,7 @@ final class NotchViewModel: ObservableObject {
         didSet { Defaults.set(.panelWaves, panelWaves) }
     }
     /// How dramatic live waves are: 0 calm … 1 wild.
-    @Published var waveIntensity: Double = Defaults.double(.waveIntensity, default: 0.6) {
+    @Published var waveIntensity: Double = Defaults.double(.waveIntensity, default: 0.53) {
         didSet {
             Defaults.set(.waveIntensity, waveIntensity)
             AudioLevels.shared.intensity = Float(waveIntensity)
