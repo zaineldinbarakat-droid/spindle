@@ -27,8 +27,8 @@ struct VinylView: View {
     @AppStorage(Defaults.Key.recordRPM.rawValue) private var storedRPM = Theme.Record.rpm
     /// Off: the album art holds still while the record turns under it.
     @AppStorage(Defaults.Key.labelSpins.rawValue) private var labelSpins = true
-    /// Faint, uneven sheen and dust in the grooves that turn with the record, so the
-    /// spin shows on the vinyl itself (perfect grooves look still when they turn).
+    /// The lamp's reflection sways once a turn, the way it does on a real (never quite
+    /// flat) record, so the spin shows on the vinyl itself: perfect grooves look still.
     @AppStorage(Defaults.Key.showsSpin.rawValue) private var showsSpin = false
 
     private var degreesPerSecond: Double { (rpm ?? storedRPM) * 6 }
@@ -98,45 +98,10 @@ struct VinylView: View {
 
     private func rotatingDisc(size: CGFloat) -> some View {
         ZStack {
-            if showsSpin {
-                dust(size: size)
-            }
             matrixEtching(size: size)
             if labelSpins {
                 label(size: size)
             }
-        }
-        .frame(width: size, height: size)
-    }
-
-    /// The dust every played record carries: a few soft specks and a stray fibre, sitting
-    /// in the grooves and turning with them.
-    private func dust(size: CGFloat) -> some View {
-        let specks: [(angle: Double, radius: CGFloat, scale: CGFloat, opacity: Double)] = [
-            (0.5, 0.87, 1.0, 0.42), (2.3, 0.64, 0.7, 0.32), (3.6, 0.76, 0.85, 0.36), (5.2, 0.53, 0.6, 0.28)
-        ]
-        let fibreAngle = 4.3
-        let fibreRadius = size / 2 * 0.70
-        return ZStack {
-            ForEach(specks.indices, id: \.self) { index in
-                let speck = specks[index]
-                let diameter = max(size * 0.009 * speck.scale, 0.8)
-                Circle()
-                    .fill(RadialGradient(colors: [.white.opacity(speck.opacity), .white.opacity(0)],
-                                         center: .center, startRadius: 0, endRadius: diameter / 2))
-                    .frame(width: diameter, height: diameter)
-                    .offset(x: cos(speck.angle) * size / 2 * speck.radius,
-                            y: sin(speck.angle) * size / 2 * speck.radius)
-            }
-            // A short, curled fibre lying across a few grooves.
-            Path { path in
-                let start = CGPoint(x: size / 2 + cos(fibreAngle) * fibreRadius,
-                                    y: size / 2 + sin(fibreAngle) * fibreRadius)
-                path.move(to: start)
-                path.addQuadCurve(to: CGPoint(x: start.x + size * 0.035, y: start.y + size * 0.012),
-                                  control: CGPoint(x: start.x + size * 0.012, y: start.y - size * 0.014))
-            }
-            .stroke(Color.white.opacity(0.22), style: StrokeStyle(lineWidth: max(size * 0.0025, 0.35), lineCap: .round))
         }
         .frame(width: size, height: size)
     }

@@ -210,7 +210,7 @@ struct SettingsView: View {
             Toggle("Show the record turning", isOn: $showsSpin)
                 .disabled(artworkStyle != .vinyl)
         } footer: {
-            Text("Album art sets how much of the record the cover's label fills; the grooves and the tonearm make room for it. With the art held still, the record turns underneath it. A real record's grooves look still as they turn, so Show the record turning adds the faint, uneven sheen and dust that give the spin away. Everything here applies to every record: the notch, the widgets and the turntable wallpaper.")
+            Text("Album art sets how much of the record the cover's label fills; the grooves and the tonearm make room for it. With the art held still, the record turns underneath it. A real record's grooves look still as they turn; what gives the spin away is the lamp's reflection swaying a little once a turn, because no record is perfectly flat. Show the record turning adds that sway. Everything here applies to every record: the notch, the widgets and the turntable wallpaper.")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }
